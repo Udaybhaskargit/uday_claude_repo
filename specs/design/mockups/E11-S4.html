@@ -4,21 +4,33 @@
   Epic: E11 — Internal Portal
   Depends on: E9-S4 (GET /api/admin/claims, GET /api/admin/payouts,
               POST /api/admin/claims/{id}/override,
-              GET /api/admin/claims/{id}/overrides)
+              GET /api/admin/claims/{id}/overrides,
+              POST /api/admin/claims/{id}/retry)
 
-  SCHEMA NOTE: api-contracts.md did not exist when this was authored.
-  Fields (status, product/claim_type, Settlement claim id/amount/timestamp,
-  AdminOverride admin actor/command/reason_code/timestamp) come from
-  E9-S4 and E8-S2. The exact set of valid "command" values for an override
-  (e.g. FORCE_APPROVE, FORCE_REJECT, FORCE_STATUS) is not enumerated in
-  any story — flagged as a SCHEMA GAP; this mockup uses a free-text command
-  field plus a target-status select as a plausible interpretation.
+  RECONCILED against specs/design/api-contracts.md (confirmed present).
+  GET /api/admin/claims?status=&product= response: { claims: [ { claim_id,
+  claim_type, status, claim_amount, updated_at } ] } — no policy_number.
+  GET /api/admin/payouts response: { payouts: [ { settlement_id, claim_id,
+  payout_amount, payment_reference, created_at } ] }, ordered by
+  created_at DESC (already reverse-chronological, read-only, AC2).
+  POST /api/admin/claims/{id}/override body: { command
+  (FORCE_APPROVE|FORCE_REJECT|FORCE_MANUAL_REVIEW|FORCE_RETRY), reason_code
+  (free-text string, min length 1 — NOT the closed ReasonCode enum) }.
+  GET /api/admin/claims/{id}/overrides response: { overrides: [
+  { override_id, admin_actor_id, command, reason_code, created_at } ] },
+  ordered by created_at ASCENDING.
+
+  SCHEMA NOTE: an earlier pass (before api-contracts.md existed) showed a
+  policy_number column on the claim queue and used a closed-enum dropdown
+  for the override reason_code — both corrected above. The set of
+  AdminOverrideCommand values and the free-text nature of override
+  reason_code are taken directly from the now-available contract.
 
   Self-contained: no CDN, no network calls. Status/product filters update
-  the table client-side without reload (AC1). Payout audit trail is
-  reverse-chronological and read-only, with no edit controls (AC2).
-  Override submission without a reason code is blocked (AC3); a successful
-  override appends a new row to that claim's audit history (AC4).
+  the table client-side without reload (AC1). Override without a
+  reason_code is blocked (AC3); a successful override appends a new row
+  to the bottom of that claim's audit history, matching the contract's
+  ascending order (AC4).
 -->
 <html lang="en">
 <head>
@@ -72,6 +84,7 @@
   .field{margin-bottom:16px;}
   .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--navy-800);margin-bottom:7px;}
   select, input[type=text]{width:100%;padding:9px 11px;border:1.5px solid #cdd5e0;border-radius:4px;font-size:13.5px;font-family:var(--font-body);background:#fcfdfe;}
+  .field .hint{font-size:11.5px;color:var(--slate-500);margin-top:5px;}
   .error-text{color:var(--red-600);font-size:12px;margin-top:6px;display:none;font-weight:600;}
   .field.invalid select, .field.invalid input{border-color:var(--red-600);background:var(--red-050);}
   .field.invalid .error-text{display:block;}
@@ -97,7 +110,7 @@
     <a href="E11-S3.html">Workbench</a>
     <a href="E11-S4.html" class="current">Admin</a>
   </nav>
-  <div style="font-size:11px;color:var(--slate-300);">X-Role: ADMIN</div>
+  <div style="font-size:11px;color:var(--slate-300);">X-Role: ADMIN &middot; X-Actor-Id: admin-1</div>
 </header>
 
 <main>
@@ -108,7 +121,7 @@
     <h2>Claim queue <span class="api-tag">GET /api/admin/claims?status=&amp;product=</span></h2>
     <div class="filters-bar">
       <div class="f">
-        <label for="filter-status">Status</label>
+        <label for="filter-status">status</label>
         <select id="filter-status">
           <option value="ALL">All statuses</option>
           <option value="DOCS_PENDING">DOCS_PENDING</option>
@@ -121,7 +134,7 @@
         </select>
       </div>
       <div class="f">
-        <label for="filter-product">Product (claim_type)</label>
+        <label for="filter-product">product</label>
         <select id="filter-product">
           <option value="ALL">All products</option>
           <option value="MOTOR">MOTOR</option>
@@ -131,27 +144,27 @@
       </div>
     </div>
     <table id="claims-table">
-      <thead><tr><th>Claim ID</th><th>Policy number</th><th>Claim type</th><th>Status</th><th>Claim amount</th></tr></thead>
+      <thead><tr><th>claim_id</th><th>claim_type</th><th>status</th><th>claim_amount</th><th>updated_at</th></tr></thead>
       <tbody id="claims-body">
         <tr data-status="MANUAL_REVIEW" data-product="HEALTH">
-          <td data-label="Claim ID">CLM-2026-07715</td><td data-label="Policy">POL-2026-009944</td><td data-label="Type">HEALTH</td>
-          <td data-label="Status"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></td><td data-label="Amount">&#8377;78,000.00</td>
+          <td data-label="claim_id">4287</td><td data-label="claim_type">HEALTH</td>
+          <td data-label="status"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></td><td data-label="claim_amount">&#8377;78,000.00</td><td data-label="updated_at">2026-09-04T11:20:00Z</td>
         </tr>
         <tr data-status="MANUAL_REVIEW" data-product="MOTOR">
-          <td data-label="Claim ID">CLM-2026-07850</td><td data-label="Policy">POL-2026-005112</td><td data-label="Type">MOTOR</td>
-          <td data-label="Status"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></td><td data-label="Amount">&#8377;90,000.00</td>
+          <td data-label="claim_id">4455</td><td data-label="claim_type">MOTOR</td>
+          <td data-label="status"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></td><td data-label="claim_amount">&#8377;90,000.00</td><td data-label="updated_at">2026-09-05T08:02:00Z</td>
         </tr>
         <tr data-status="DOCS_PENDING" data-product="MOTOR">
-          <td data-label="Claim ID">CLM-2026-07721</td><td data-label="Policy">POL-2026-004821</td><td data-label="Type">MOTOR</td>
-          <td data-label="Status"><span class="pill pill-DOCS_PENDING">DOCS_PENDING</span></td><td data-label="Amount">&#8377;42,500.00</td>
+          <td data-label="claim_id">4231</td><td data-label="claim_type">MOTOR</td>
+          <td data-label="status"><span class="pill pill-DOCS_PENDING">DOCS_PENDING</span></td><td data-label="claim_amount">&#8377;42,500.00</td><td data-label="updated_at">2026-08-29T16:40:00Z</td>
         </tr>
         <tr data-status="SETTLED" data-product="MOTOR">
-          <td data-label="Claim ID">CLM-2026-07690</td><td data-label="Policy">POL-2026-002210</td><td data-label="Type">MOTOR</td>
-          <td data-label="Status"><span class="pill pill-SETTLED">SETTLED</span></td><td data-label="Amount">&#8377;40,000.00</td>
+          <td data-label="claim_id">4106</td><td data-label="claim_type">MOTOR</td>
+          <td data-label="status"><span class="pill pill-SETTLED">SETTLED</span></td><td data-label="claim_amount">&#8377;40,000.00</td><td data-label="updated_at">2026-09-05T14:22:10Z</td>
         </tr>
         <tr data-status="PROCESSING_FAILED" data-product="LIFE">
-          <td data-label="Claim ID">CLM-2026-07960</td><td data-label="Policy">POL-2026-013305</td><td data-label="Type">LIFE</td>
-          <td data-label="Status"><span class="pill pill-PROCESSING_FAILED">PROCESSING_FAILED</span></td><td data-label="Amount">&#8377;150,000.00</td>
+          <td data-label="claim_id">4602</td><td data-label="claim_type">LIFE</td>
+          <td data-label="status"><span class="pill pill-PROCESSING_FAILED">PROCESSING_FAILED</span></td><td data-label="claim_amount">&#8377;150,000.00</td><td data-label="updated_at">2026-09-02T07:15:33Z</td>
         </tr>
       </tbody>
     </table>
@@ -162,12 +175,12 @@
     <div>
       <h2>Payout audit trail <span class="api-tag">GET /api/admin/payouts</span> <span class="readonly-badge">Read-only</span></h2>
       <table>
-        <thead><tr><th>Timestamp</th><th>Claim ID</th><th>Amount</th></tr></thead>
+        <thead><tr><th>created_at</th><th>claim_id</th><th>payout_amount</th><th>payment_reference</th></tr></thead>
         <tbody>
-          <tr><td data-label="Timestamp">2026-09-05 14:22:10</td><td data-label="Claim ID">CLM-2026-07690</td><td data-label="Amount">&#8377;35,000.00</td></tr>
-          <tr><td data-label="Timestamp">2026-09-03 09:11:47</td><td data-label="Claim ID">CLM-2026-07602</td><td data-label="Amount">&#8377;17,100.00</td></tr>
-          <tr><td data-label="Timestamp">2026-08-30 16:45:02</td><td data-label="Claim ID">CLM-2026-07530</td><td data-label="Amount">&#8377;22,000.00</td></tr>
-          <tr><td data-label="Timestamp">2026-08-27 11:03:38</td><td data-label="Claim ID">CLM-2026-07488</td><td data-label="Amount">&#8377;150,000.00</td></tr>
+          <tr><td data-label="created_at">2026-09-05T14:22:10Z</td><td data-label="claim_id">4106</td><td data-label="payout_amount">&#8377;35,000.00</td><td data-label="payment_reference">STUB-PAY-0000004106-01</td></tr>
+          <tr><td data-label="created_at">2026-09-03T09:11:47Z</td><td data-label="claim_id">4033</td><td data-label="payout_amount">&#8377;17,100.00</td><td data-label="payment_reference">STUB-PAY-0000004033-01</td></tr>
+          <tr><td data-label="created_at">2026-08-30T16:45:02Z</td><td data-label="claim_id">3980</td><td data-label="payout_amount">&#8377;22,000.00</td><td data-label="payment_reference">STUB-PAY-0000003980-01</td></tr>
+          <tr><td data-label="created_at">2026-08-27T11:03:38Z</td><td data-label="claim_id">3925</td><td data-label="payout_amount">&#8377;150,000.00</td><td data-label="payment_reference">STUB-PAY-0000003925-01</td></tr>
         </tbody>
       </table>
     </div>
@@ -177,44 +190,39 @@
       <div class="card">
         <form id="override-form">
           <div class="field">
-            <label for="override-claim">Claim</label>
+            <label for="override-claim">Claim (id)</label>
             <select id="override-claim">
-              <option value="CLM-2026-07960">CLM-2026-07960 (PROCESSING_FAILED)</option>
-              <option value="CLM-2026-07850">CLM-2026-07850 (MANUAL_REVIEW)</option>
+              <option value="4602">4602 (PROCESSING_FAILED)</option>
+              <option value="4455">4455 (MANUAL_REVIEW)</option>
             </select>
           </div>
           <div class="field">
-            <label for="override-command">Command</label>
+            <label for="override-command">command</label>
             <select id="override-command">
+              <option value="FORCE_RETRY">FORCE_RETRY</option>
               <option value="FORCE_APPROVE">FORCE_APPROVE</option>
               <option value="FORCE_REJECT">FORCE_REJECT</option>
-              <option value="RETRY_PIPELINE">RETRY_PIPELINE</option>
+              <option value="FORCE_MANUAL_REVIEW">FORCE_MANUAL_REVIEW</option>
             </select>
           </div>
           <div class="field" id="field-reason-code">
-            <label for="override-reason">Reason code</label>
-            <select id="override-reason">
-              <option value="">-- select a reason code --</option>
-              <option value="HIGH_VALUE_REVIEW">HIGH_VALUE_REVIEW</option>
-              <option value="FRAUD_FLAG">FRAUD_FLAG</option>
-              <option value="ZERO_PAYABLE_AMOUNT">ZERO_PAYABLE_AMOUNT</option>
-              <option value="DOCS_INCOMPLETE">DOCS_INCOMPLETE</option>
-              <option value="POLICY_INACTIVE">POLICY_INACTIVE</option>
-            </select>
-            <div class="error-text">Reason code is required before submitting an override.</div>
+            <label for="override-reason">reason_code</label>
+            <input type="text" id="override-reason" placeholder="e.g. Manual goodwill approval after phone review">
+            <div class="hint">Free-text audit reason, minimum length 1 (not a closed enum).</div>
+            <div class="error-text">reason_code is required before submitting an override.</div>
           </div>
           <button type="submit" class="primary">Submit override</button>
         </form>
         <div class="confirmation" id="override-confirmation">
-          <strong>200 OK.</strong> AdminOverride recorded for <span id="conf-claim"></span>. See audit history below.
+          <strong>200 OK.</strong> AdminOverride recorded for claim_id <span id="conf-claim"></span>. See audit history below.
         </div>
       </div>
 
       <h2 style="margin-top:24px;">Override history <span class="api-tag">GET /api/admin/claims/{id}/overrides</span></h2>
       <table>
-        <thead><tr><th>Timestamp</th><th>Admin</th><th>Command</th><th>Reason code</th></tr></thead>
+        <thead><tr><th>created_at</th><th>admin_actor_id</th><th>command</th><th>reason_code</th></tr></thead>
         <tbody id="override-history-body">
-          <tr><td data-label="Timestamp">2026-08-22 10:15:00</td><td data-label="Admin">admin-vikram.shah</td><td data-label="Command">RETRY_PIPELINE</td><td data-label="Reason">DOCS_INCOMPLETE</td></tr>
+          <tr><td data-label="created_at">2026-08-22T10:15:00Z</td><td data-label="admin_actor_id">admin-1</td><td data-label="command">FORCE_RETRY</td><td data-label="reason_code">Retriggering after transient DB timeout</td></tr>
         </tbody>
       </table>
     </div>
@@ -243,8 +251,8 @@
   document.getElementById('override-form').addEventListener('submit', function(e){
     e.preventDefault();
     var reasonField = document.getElementById('field-reason-code');
-    var reasonSelect = document.getElementById('override-reason');
-    if(!reasonSelect.value){
+    var reasonInput = document.getElementById('override-reason');
+    if(!reasonInput.value.trim()){
       reasonField.classList.add('invalid');
       return; // blocked, no API call
     }
@@ -252,16 +260,19 @@
 
     var claim = document.getElementById('override-claim').value;
     var command = document.getElementById('override-command').value;
-    var reason = reasonSelect.value;
-    var now = new Date().toISOString().replace('T',' ').slice(0,19);
+    var reason = reasonInput.value.trim();
+    var now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
+    // Contract: GET /api/admin/claims/{id}/overrides is ordered by
+    // created_at ASCENDING — append the new row at the bottom.
     var tbody = document.getElementById('override-history-body');
     var tr = document.createElement('tr');
-    tr.innerHTML = '<td data-label="Timestamp">'+now+'</td><td data-label="Admin">admin-'+(window.__demoAdmin||'anita.iyer')+'</td><td data-label="Command">'+command+'</td><td data-label="Reason">'+reason+'</td>';
-    tbody.insertBefore(tr, tbody.firstChild);
+    tr.innerHTML = '<td data-label="created_at">'+now+'</td><td data-label="admin_actor_id">admin-1</td><td data-label="command">'+command+'</td><td data-label="reason_code">'+reason+'</td>';
+    tbody.appendChild(tr);
 
     document.getElementById('conf-claim').textContent = claim;
     document.getElementById('override-confirmation').classList.add('show');
+    reasonInput.value = '';
     setTimeout(function(){ document.getElementById('override-confirmation').classList.remove('show'); }, 3000);
   });
 })();

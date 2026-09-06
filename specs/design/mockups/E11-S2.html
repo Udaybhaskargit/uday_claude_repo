@@ -4,15 +4,17 @@
   Epic: E11 — Internal Portal
   Depends on: E9-S3 (GET /api/claims/fraud-alerts)
 
-  RECONCILED against specs/design/api-contracts.md (confirmed present).
-  GET /api/claims/fraud-alerts response: { claims: [ { claim_id (integer),
-  claim_type, fraud_score (integer), triggered_rules: [rule_name,...] } ] }.
-  Confirmed exact rule names from the contract's own examples:
-  HIGH_CLAIM_TO_SUM_RATIO, EARLY_FILING. The remaining three fraud rules
-  from E2-S1 (frequent claims in 90 days, motor missing FIR, round-number
-  amount) are not given explicit identifier strings anywhere in the
-  stories or api-contracts.md — FREQUENT_CLAIMS_90D, MOTOR_MISSING_FIR and
-  ROUND_NUMBER_AMOUNT below are inferred, flagged as a SCHEMA GAP.
+  RECONCILED against specs/design/api-contracts.md (confirmed present) and
+  specs/design/data-models.md / data-models.schema.json (FraudRuleBreakdownEntry,
+  section 3.2), which define the closed `rule_name` enum authoritatively:
+  HIGH_CLAIM_TO_SUM_RATIO, EARLY_FILING, CLAIM_FREQUENCY, MOTOR_MISSING_FIR,
+  ROUND_NUMBER_CLAIM. GET /api/claims/fraud-alerts response: { claims: [
+  { claim_id (integer), claim_type, fraud_score (integer),
+  triggered_rules: [rule_name,...] } ] }. All five rule_name values below
+  now match the data-models.schema.json enum verbatim — an earlier draft
+  used invented identifiers (FREQUENT_CLAIMS_90D, ROUND_NUMBER_AMOUNT) for
+  the two rules not shown in api-contracts.md's own examples; corrected to
+  CLAIM_FREQUENCY and ROUND_NUMBER_CLAIM to match the schema.
 
   SCHEMA NOTE: an earlier pass (before api-contracts.md existed) also
   displayed policy_number and claim_amount on each row — removed now
@@ -130,7 +132,7 @@
           <div class="rules">
             <span class="rule-chip">HIGH_CLAIM_TO_SUM_RATIO</span>
             <span class="rule-chip">MOTOR_MISSING_FIR</span>
-            <span class="rule-chip">ROUND_NUMBER_AMOUNT</span>
+            <span class="rule-chip">ROUND_NUMBER_CLAIM</span>
           </div>
           <div class="flag-pill">flagged</div>
         </div>
@@ -147,8 +149,8 @@
           <div class="claim-meta">claim_type: MOTOR</div>
           <div class="rules">
             <span class="rule-chip">HIGH_CLAIM_TO_SUM_RATIO</span>
-            <span class="rule-chip">FREQUENT_CLAIMS_90D</span>
-            <span class="rule-chip">ROUND_NUMBER_AMOUNT</span>
+            <span class="rule-chip">CLAIM_FREQUENCY</span>
+            <span class="rule-chip">ROUND_NUMBER_CLAIM</span>
             <span class="rule-chip">MOTOR_MISSING_FIR</span>
           </div>
           <div class="flag-pill">flagged</div>

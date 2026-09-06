@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!--
+  ClaimFlow — Design mockup index.
+  Links every UI-layer story mockup, reconciled against
+  specs/design/api-contracts.md.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow — Mockup Index</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30;
+    --amber-500:#e8a33d; --amber-400:#f0b85c;
+    --slate-100:#f5f7fa; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:26px 32px;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:26px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top p{color:var(--slate-300);font-size:13px;margin:6px 0 0;max-width:70ch;}
+  main{max-width:980px;margin:0 auto;padding:32px 24px 80px;}
+  h2{font-family:var(--font-display);font-size:20px;margin:36px 0 14px;border-bottom:2px solid #e1e6ee;padding-bottom:8px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .mockup-card{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--navy-900);border-radius:6px;padding:18px 20px;text-decoration:none;color:var(--navy-950);display:block;}
+  .mockup-card:hover{border-left-color:var(--amber-500);}
+  .mockup-card .story-id{font-family:monospace;font-size:11px;color:var(--amber-500);background:var(--navy-950);display:inline-block;padding:2px 8px;border-radius:3px;margin-bottom:8px;}
+  .mockup-card h3{font-family:var(--font-display);font-size:17px;margin:0 0 8px;}
+  .mockup-card .endpoints{font-size:11.5px;color:var(--slate-700);font-family:monospace;line-height:1.6;}
+  .note{background:#fff;border:1px dashed var(--slate-500);border-radius:6px;padding:16px 20px;font-size:13px;color:var(--slate-700);margin-top:10px;}
+  @media (max-width:600px){ .grid{grid-template-columns:1fr;} header.top{padding:20px 18px;} main{padding:22px 16px 60px;} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Claim<span>Flow</span> — Design Mockups</div>
+  <p>Horizon Insurance FNOL-to-settlement platform. All 7 UI-layer stories (E10 Customer Portal, E11 Internal Portal), reconciled against specs/design/api-contracts.md.</p>
+</header>
+
+<main>
+  <h2>E10 — Customer Portal</h2>
+  <div class="grid">
+    <a class="mockup-card" href="E10-S1.html">
+      <div class="story-id">E10-S1</div>
+      <h3>FNOL submission form</h3>
+      <div class="endpoints">POST /api/claims</div>
+    </a>
+    <a class="mockup-card" href="E10-S2.html">
+      <div class="story-id">E10-S2</div>
+      <h3>Claim tracker view</h3>
+      <div class="endpoints">GET /api/claims/{id}</div>
+    </a>
+    <a class="mockup-card" href="E10-S3.html">
+      <div class="story-id">E10-S3</div>
+      <h3>Dispute action flow</h3>
+      <div class="endpoints">POST /api/claims/{id}/reopen</div>
+    </a>
+  </div>
+
+  <h2>E11 — Internal Portal</h2>
+  <div class="grid">
+    <a class="mockup-card" href="E11-S1.html">
+      <div class="story-id">E11-S1</div>
+      <h3>Document verification queue</h3>
+      <div class="endpoints">GET /api/claims/documents/pending<br>PATCH /api/claims/{id}/documents/{type}</div>
+    </a>
+    <a class="mockup-card" href="E11-S2.html">
+      <div class="story-id">E11-S2</div>
+      <h3>Fraud alert queue</h3>
+      <div class="endpoints">GET /api/claims/fraud-alerts</div>
+    </a>
+    <a class="mockup-card" href="E11-S3.html">
+      <div class="story-id">E11-S3</div>
+      <h3>Assessor workbench</h3>
+      <div class="endpoints">GET /api/claims/{id}/workbench<br>POST /api/claims/{id}/decision</div>
+    </a>
+    <a class="mockup-card" href="E11-S4.html">
+      <div class="story-id">E11-S4</div>
+      <h3>Admin dashboard</h3>
+      <div class="endpoints">GET /api/admin/claims<br>GET /api/admin/payouts<br>POST /api/admin/claims/{id}/override<br>GET /api/admin/claims/{id}/overrides</div>
+    </a>
+  </div>
+
+  <div class="note">
+    <strong>Provenance note:</strong> api-contracts.md did not exist when E10-S1, E10-S2 and E10-S3
+    were first drafted; those three (plus all others) were reconciled against the contract once it
+    appeared mid-pass. Remaining schema gaps (LIFE document checklist, three of the five fraud rule
+    identifier strings, and the exact assessor-facing outcome vocabulary) are flagged inline as HTML
+    comments at the top of each affected mockup file.
+  </div>
+</main>
+</body>
+</html>
