@@ -442,8 +442,8 @@
       "Action: Get_by_number() is called.",
       "Assert: It returns the Policy with matching sum_insured and dates."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -458,8 +458,8 @@
       "Action: Get_by_number() is called.",
       "Assert: It returns None rather than raising, so the caller can produce a domain-level error."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -474,8 +474,8 @@
       "Action: Is_active_on(date) is called with a date outside [effective_date, expiry_date].",
       "Assert: It returns False."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -490,8 +490,8 @@
       "Action: Create() is called.",
       "Assert: A row is inserted with status='INTAKE' and the generated id is returned."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -506,8 +506,8 @@
       "Action: Apply_transition() is called.",
       "Assert: The row's status column is updated and a claim_state_transitions row is inserted in the same transaction."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -522,8 +522,8 @@
       "Action: Apply_transition() is called.",
       "Assert: No row is mutated and InvalidClaimStateException propagates."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -538,8 +538,8 @@
       "Action: List_by_status_and_product() is called with filters.",
       "Assert: Only matching rows are returned."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -554,8 +554,8 @@
       "Action: Exists_duplicate() is called.",
       "Assert: It returns True."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -570,8 +570,8 @@
       "Action: Insert() is called twice for the same claim.",
       "Assert: Both rows persist with history preserved and no overwrite."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -586,8 +586,8 @@
       "Action: Its public interface is inspected.",
       "Assert: It exposes no update() or delete() method for any of the five entities."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -602,8 +602,8 @@
       "Action: Get_latest_assessment() is called.",
       "Assert: It returns the most recently inserted Assessment row for that claim."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -618,8 +618,8 @@
       "Action: List_admin_overrides() is called.",
       "Assert: It returns all override rows ordered by timestamp ascending."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T19:04:55.946323Z",
     "failure_reason": null,
     "failure_layer": null
   },

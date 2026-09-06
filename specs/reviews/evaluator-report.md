@@ -368,3 +368,78 @@ This required direct empirical verification rather than trusting prior training 
 - `backend/requirements.txt` (`httpx2` dependency independently verified installed/importable/functional in `backend/.venv`)
 - `git show --stat` for `071de41` and `20e9bcf` (confirmed zero file overlap between the two generator commits)
 - `features.json` (F024-F027, F085-F088 updated to `passes: true` following this evaluation)
+
+## Group D — Repository Layer (E3-S2, E3-S3, E3-S4)
+
+**Branch:** `group-d/repositories`, three concurrent-generator commits on top of Group C:
+- `d06d378` — E3-S2 policy repository
+- `199edf6` — E3-S4 append-only audit repositories
+- `f58dd2c` — E3-S3 claim + claim_document repositories
+
+**Concurrency/collision check:** `git show --stat` on each commit confirms disjoint file sets (3 + 7 + 4 = 14 files touched, zero overlap). Cross-checked with `git diff --stat` across the full range: exactly 14 files changed, matching the per-commit sum with no double-counting. All three agents also independently avoided a shared-fixture collision risk: `test_audit_repositories.py`'s own docstring notes it seeds its own claim rows via raw SQL rather than importing the concurrently-developed `ClaimRepository`, since that module might not exist yet in a parallel working tree — deliberate, disclosed isolation, not an accident.
+
+### Milestone note: Repository layer structurally complete
+
+With Group D merged, the persistence stack built across Groups B/C/D is now structurally complete: `backend/src/db/connection.py` (SQLite connection factory with FK enforcement + row_factory), `backend/src/db/migration_runner.py` (checksum-verified sequential migration runner), and all 7 repository modules — `policy_repository.py`, `claim_repository.py`, `claim_document_repository.py`, and the 5 append-only audit repositories (`fraud_screening`, `assessment`, `decision`, `settlement`, `admin_override`). Every one of the 7 new repository files imports only stdlib (`sqlite3`, `json`, `decimal`, `datetime`) plus `src.types.*` — verified by direct grep of every `import`/`from` line in all 7 files, and a targeted `grep -rn "src\.services\|src\.api" src/repositories/` returned zero hits. No repository reaches upward into services or API. Coverage across the whole `src/` tree remains 100% (618/618 statements) after this merge.
+
+### Verdicts
+
+**E3-S2 (policy repository): PASS**
+**E3-S3 (claim + claim_document repositories): PASS**
+**E3-S4 (append-only audit repositories): PASS**
+
+### Independent verification performed (not just re-reading the generator's own tests)
+
+All checks below were run via a standalone script executed against a real migrated SQLite DB (`run_migrations` against the actual `backend/migrations/*.sql` files, not a mock), re-querying tables directly with `sqlite3.Connection.execute` after every repository call rather than trusting return values.
+
+1. **F028/F029/F030 — policy repository.** Seeded a real `policies` row via direct SQL, then confirmed: `get_by_number()` returns a `Policy` with `sum_insured` as a genuine `Decimal("100000.00")` (checked with `isinstance`, not just equality) and correct `effective_date`/`expiry_date`; a nonexistent policy number returns `None` (no exception); and — the critical check — `is_active_on()` called on the object actually returned by the repository (not a freshly constructed `Policy`) correctly returns `False` for dates outside `[effective_date, expiry_date]` and `True` inside the window. This confirms `PolicyRepository.get_by_number()` reconstructs a fully-functional typed instance, not a data blob with a method that happens to exist on the class.
+
+2. **F031 — claim creation.** Called `create()`, then independently queried `SELECT status, id FROM claims WHERE id=?` directly — confirmed `status='INTAKE'` and the row's `id` matches the returned int, rather than trusting `create()`'s return value alone.
+
+3. **F032 — apply_transition, same-transaction persistence (the critical check).** Called `apply_transition(claim_id, ClaimEvent.ATTACH_CHECKLIST, actor_id="assessor-1")`, then independently re-queried both `claims` (status now `DOCS_PENDING`) and `claim_state_transitions` (exactly one new row, with `from_state=INTAKE`, `to_state=DOCS_PENDING`, `event=ATTACH_CHECKLIST`, `actor_id=assessor-1` all matching). Transaction-handling review: `claim_repository.py:102-119` wraps both the `UPDATE claims` and `INSERT INTO claim_state_transitions` statements inside `with self._connection:` — Python's `sqlite3.Connection` context manager, which commits on clean exit and rolls back on exception. This is explicit transaction handling, not two independent autocommit statements: a crash between the two writes would leave the transaction uncommitted and SQLite's own crash-recovery (journal/WAL) would roll it back on next open, so there is no inconsistent-state window. No design concern found here — the "same transaction" AC text is satisfied for real, not just by sequencing the two statements adjacently.
+
+4. **F033 — invalid event leaves claim unmutated.** Confirmed the code path: `apply_transition()` calls `state_machine.transition(claim, event, actor_id)` (`claim_repository.py:100`) before either SQL statement is reached; `transition()` (`state_machine.py:72-77`) raises `InvalidClaimStateException` and returns before ever assigning `claim.status`, so the `with self._connection:` block containing the two writes is never entered at all on the invalid-event path — confirmed by reading the control flow, not inferred. Empirically: called `apply_transition()` with `DECISION_AUTO_APPROVE` against a claim in `DOCS_PENDING` (not in that state's transition table), confirmed `InvalidClaimStateException` raised, then re-queried the claim row directly — `status` and `updated_at` are byte-for-byte identical (including the full ISO timestamp string) to their pre-call values, and `claim_state_transitions` row count for that claim is unchanged.
+
+5. **F034 — list_by_status_and_product.** Seeded 4 claims with distinct status/claim_type combinations across `INTAKE`/`DOCS_PENDING` and `MOTOR`/`HEALTH`/`LIFE`, then called the method with status-only, claim_type-only, both, and neither filters. Every call returned the exact expected id set (verified via set equality, not just count) — e.g. status-only `DOCS_PENDING` returned exactly `{1,3,4}`, both-filters `DOCS_PENDING+MOTOR` returned exactly `{1,3}`.
+
+6. **F035 — exists_duplicate.** Confirmed `True` for a matching `(policy_id, incident_date)` pair and `False` for a non-matching date. Judgment on the "non-void" interpretation: the repository treats any existing claim row for `(policy_id, incident_date)` as a duplicate regardless of status, including `REJECTED`/`SETTLED` claims — the generator's own docstring (`claim_repository.py:156-161`) and test docstring (`test_claim_repository.py:356-363`) both disclose this explicitly as "the narrowest reading that doesn't invent an undocumented exclusion list," since the story text and `data-models.md` never define which statuses count as "void." I traced the actual consumer chain: `exists_duplicate()` is only exercised by the E4-S3 FNOL-intake flow (Group F, not yet built), which is a new-claim-submission code path. The E7-S2 `reopen()` flow (Group E, not yet built) that creates a `parent_claim_id`-linked sub-claim is a structurally separate service method operating on an already-SETTLED claim, not a new FNOL submission — `data-models.md` sec 2.2 and the E7-S2 story text describe `reopen()` as disputing the same incident, so a reopened sub-claim would be expected to carry the same `(policy_id, incident_date)` as its parent, and would go through `reopen()`/`ClaimRepository.create()` directly rather than through the FNOL intake path that calls `exists_duplicate()`. On that reading, this over-blocking scenario likely does not materialize in practice — but this is an inference about code that does not exist yet (Groups E/F), not something verifiable today. This is not a Group D defect; flagging it as an explicit note for whoever implements E4-S3 (Group F) and E7-S2 (Group E): confirm at that time that `reopen()`'s claim-creation path does not route through `exists_duplicate()`, and that E4-S3's own tests don't assume a status-based exclusion the repository doesn't implement.
+
+7. **F036 — FraudScreening insert-twice.** Called `insert()` twice for the same `claim_id` with different scores (65, then 30), independently queried `SELECT id, score FROM fraud_screenings WHERE claim_id=?` — confirmed 2 distinct ids and both scores (`30` and `65`) present, neither overwritten.
+
+8. **F037 — insert-only structural guarantee, mutation-tested independently.** Rather than trusting the generator's claim to have already exercised this, I repeated the exercise myself: temporarily inserted `def update(self) -> None: pass` into `DecisionRepository` (one of the 5 audit classes), re-ran `test_audit_repositories_insert_only.py`, and confirmed it failed (`AssertionError: found forbidden update()/delete() methods on audit repositories: {'DecisionRepository': {'update'}}`). Then reverted via `git checkout -- src/repositories/decision_repository.py` and re-ran — 2 passed, clean again, with `git status` confirming no residual diff. The guard is a genuine `inspect.getmembers` reflection check on the live class object (`test_audit_repositories_insert_only.py:32-37`), not a static assumption.
+
+9. **F038 — get_latest_assessment.** Inserted 3 assessments for one claim with distinguishable `payable_amount` values (850, 1850, 2850, inserted in that order). `get_latest_assessment()` returned the row with `id` equal to the third inserted id specifically (not merely "an" assessment) and `payable_amount == Decimal("2850")`, matching the last insert. Confirmed the `ORDER BY created_at DESC, id DESC LIMIT 1` tie-break logic in `assessment_repository.py:66` is sound for SQLite's second-level timestamp granularity.
+
+10. **F039 — list_admin_overrides ascending order.** Inserted 3 overrides for one claim, confirmed the returned list's ids are in ascending insertion order (oldest to newest) — the opposite of the "latest" pattern used by the other four audit repositories. Double-checked the SQL directly: `admin_override_repository.py:50` reads `ORDER BY created_at ASC, id ASC`, correctly the inverse direction from `fraud_screening_repository.py:58`, `assessment_repository.py:66`, and `decision_repository.py:50`, all of which use `DESC`.
+
+### Cross-agent consistency (non-blocking observations)
+
+Since three agents worked in parallel on 7 files, I checked for code-smell inconsistencies even though each file individually passes:
+
+- ID-generation pattern: identical across all 7 repositories — `cursor.lastrowid` followed by `assert new_id is not None` before returning. No divergence.
+- Decimal handling: `claim_repository.py`'s `create()` defensively re-wraps its input with `str(Decimal(claim_amount))` before storing, while the audit repositories (`assessment_repository.py`, `settlement_repository.py`) call `str(x)` directly on the already-`Decimal`-typed parameter without the extra `Decimal(...)` wrap. Both are correct given their type hints (`Decimal` is the declared parameter type in both cases), but the extra defensive wrap in `claim_repository.py` is a minor stylistic inconsistency worth aligning in a later cleanup pass — not a functional defect.
+- Commit style: single-statement inserts across all files use an explicit `self._connection.commit()` call after `execute()`; the one multi-statement write (`ClaimRepository.apply_transition`) uses the `with self._connection:` context-manager form instead. This is a reasonable and consistent convention (single write leads to manual commit, atomic multi-write leads to context manager), not an inconsistency.
+- Error-handling style: `PolicyRepository.get_by_number()` and all `get_latest*()` methods return `None` on a miss; `ClaimRepository.apply_transition()` raises `LookupError` for a missing claim id. This divergence is intentional and matches each method's own AC (`get_by_number` AC2 explicitly requires `None`; `apply_transition` has no such "not found" AC and a raised error is the more defensible default for an unexpected missing foreign key). Not flagged as an issue.
+
+No wildly divergent patterns found; the three agents' modules are stylistically coherent enough to read as one codebase.
+
+### Gate re-run results
+
+| Gate | Command | Result |
+|---|---|---|
+| pytest + coverage | `.venv/Scripts/python.exe -m pytest -q --cov=src --cov-report=term-missing` | 173 passed, 100% coverage (618/618 stmts) |
+| ruff | `.venv/Scripts/python.exe -m ruff check .` | All checks passed |
+| mypy | `.venv/Scripts/python.exe -m mypy src` | Success: no issues found in 26 source files |
+
+### Files reviewed
+
+- `specs/stories/E3-S2.md`, `E3-S3.md`, `E3-S4.md`, `E7-S2.md` (for the exists_duplicate judgment call), `E4-S3.md` (same)
+- `specs/design/data-models.md` sec 2.1-2.9 (all entity fields/constraints/indexes)
+- `backend/src/repositories/policy_repository.py`, `claim_repository.py`, `claim_document_repository.py`, `fraud_screening_repository.py`, `assessment_repository.py`, `decision_repository.py`, `settlement_repository.py`, `admin_override_repository.py`
+- `backend/src/types/state_machine.py`, `exceptions.py`, `models.py` (confirmed `apply_transition()` delegates to `transition()` rather than reimplementing state logic)
+- `backend/src/db/connection.py`, `migration_runner.py`
+- `backend/migrations/0001_create_policies.sql`, `0002_create_claims.sql` (cross-checked schema against data-models.md)
+- `backend/tests/unit/repositories/test_policy_repository.py`, `test_claim_repository.py`, `test_claim_document_repository.py`, `test_audit_repositories.py`
+- `backend/tests/architecture/test_audit_repositories_insert_only.py` (independently mutation-tested by temporarily adding `def update(self): pass` to `DecisionRepository`, confirming failure, then reverting via `git checkout` and confirming a clean pass again)
+- `git show --stat` for `d06d378`, `199edf6`, `f58dd2c` (confirmed zero file overlap between the three generator commits: 3+7+4=14 files, matching the full-range diff)
+- `features.json` (F028-F039, 12 features, updated to `passes: true` following this evaluation — verified via `git diff` that exactly and only these 12 entries changed)
