@@ -1,0 +1,73 @@
+{
+  "name": "ClaimFlow — Claims Intake, Assessment & Settlement Platform",
+  "description": "Horizon Insurance FNOL-to-settlement pipeline for motor, health, and life products: intake, document checks, fraud screening, assessment, decision, and payout. Built by Claude Code agents under the AI-Native Engineer Capstone (BC-AINE-005) constraints — no hand-written production code, spec-is-truth, PR-only merges, synthetic data only.",
+  "stack": {
+    "backend": {
+      "language": "python",
+      "version": "3.12",
+      "framework": "fastapi",
+      "package_manager": "pip",
+      "linter": "ruff",
+      "typechecker": "mypy",
+      "test_runner": "pytest"
+    },
+    "frontend": {
+      "language": "typescript",
+      "framework": "react",
+      "bundler": "vite",
+      "package_manager": "npm",
+      "linter": "eslint",
+      "typechecker": "tsc",
+      "test_runner": "vitest",
+      "e2e_runner": "playwright"
+    },
+    "database": {
+      "primary": "sqlite",
+      "secondary": "none"
+    },
+    "deployment": {
+      "method": "local",
+      "services": ["backend", "frontend"]
+    },
+    "ci": "gitlab-ci"
+  },
+  "evaluation": {
+    "api_base_url": "http://localhost:8000",
+    "ui_base_url": "http://localhost:5173",
+    "health_check": "http://localhost:8000/health",
+    "design_score_threshold": 7,
+    "design_max_iterations": 10,
+    "test_corpus_dir": "specs/test_artefacts"
+  },
+  "execution": {
+    "default_mode": "full",
+    "max_self_heal_attempts": 3,
+    "max_auto_iterations": 50,
+    "coverage_threshold": 80,
+    "session_chaining": true,
+    "agent_team_size": "auto",
+    "teammate_model": "sonnet"
+  },
+  "verification": {
+    "mode": "local",
+    "health_check": {
+      "url": "http://localhost:8000/health",
+      "retries": 5,
+      "backoff_seconds": 2
+    },
+    "local": {
+      "backend_url": "http://localhost:8000",
+      "frontend_url": "http://localhost:5173",
+      "start_commands": []
+    }
+  },
+  "capstone": {
+    "business_case_id": "BC-AINE-005",
+    "acceptance_criteria_ids": ["AC-01", "AC-02", "AC-03", "AC-04", "AC-05", "AC-06", "AC-07", "AC-08", "AC-09", "AC-10"],
+    "claim_types": ["motor", "health", "life"],
+    "no_hand_coding_rule": true,
+    "spec_is_truth_rule": true,
+    "pr_only_merge_rule": true,
+    "synthetic_data_only": true
+  }
+}

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<!--
+  Story: E10-S1 — Build the FNOL submission form
+  Epic: E10 — Customer Portal
+  Depends on: E9-S1 (POST /api/claims)
+
+  RECONCILED against specs/design/api-contracts.md (confirmed present).
+  POST /api/claims request body = { policy_number, claim_type, incident_date,
+  claim_amount } exactly — no document fields are submitted in the request.
+  The response is { claim_id (integer), status ("DOCS_PENDING"),
+  checklist: [{document_type, verification_status}] } — note the initial
+  status is DOCS_PENDING, not INTAKE, and the server generates the
+  checklist automatically from claim_type.
+
+  SCHEMA NOTE / GAP: E10-S1 AC2 requires the form to render a per-type
+  document checklist with toggles, but the POST /api/claims request body
+  in api-contracts.md does not include a documents/checklist field — the
+  checklist is server-generated after creation. The toggles below are
+  therefore presentational only (customer self-check of "do I have this
+  ready to upload"), are NOT included in the POST body, and are clearly
+  labeled as such. The LIFE claim-type checklist (DEATH_CERTIFICATE,
+  ID_PROOF) is still not enumerated in any story/contract — inferred.
+
+  Self-contained: no CDN, no network calls.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow — File a New Claim (FNOL)</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30; --navy-800:#182842; --navy-700:#233457;
+    --amber-500:#e8a33d; --amber-400:#f0b85c; --amber-050:#fbecd3;
+    --slate-100:#f5f7fa; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --green-600:#2f8f5b; --green-050:#e4f4ea;
+    --red-600:#c14a4f; --red-050:#fbe9ea;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:22px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top .tagline{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:var(--slate-300);margin-top:2px;}
+  main{max-width:760px;margin:0 auto;padding:32px 20px 80px;}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--slate-700);font-weight:600;}
+  h1{font-family:var(--font-display);font-size:32px;margin:6px 0 8px;color:var(--navy-950);}
+  p.lede{color:var(--slate-700);margin:0 0 28px;font-size:15px;line-height:1.5;max-width:56ch;}
+  form{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--navy-900);border-radius:6px;padding:28px;}
+  .field{margin-bottom:22px;}
+  .field label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--navy-800);margin-bottom:7px;}
+  .field .hint{font-size:12px;color:var(--slate-500);margin-top:5px;}
+  input[type=text],input[type=date],input[type=number],select{
+    width:100%;padding:11px 13px;border:1.5px solid #cdd5e0;border-radius:4px;font-size:15px;font-family:var(--font-body);background:#fcfdfe;
+  }
+  input:focus,select:focus{outline:2px solid var(--amber-500);outline-offset:1px;border-color:var(--amber-500);}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .claim-type-group{display:flex;gap:10px;flex-wrap:wrap;}
+  .claim-type-group input{position:absolute;opacity:0;pointer-events:none;}
+  .claim-type-group label{
+    flex:1 1 100px;text-align:center;border:1.5px solid #cdd5e0;border-radius:4px;padding:12px 8px;cursor:pointer;
+    font-family:var(--font-display);font-size:15px;letter-spacing:.03em;color:var(--navy-800);background:#fcfdfe;text-transform:none;
+  }
+  .claim-type-group input:checked + label{background:var(--navy-900);color:#fff;border-color:var(--navy-900);}
+  fieldset{border:1.5px dashed #cdd5e0;border-radius:5px;padding:16px 16px 6px;margin:0;}
+  legend{font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--navy-800);padding:0 6px;}
+  .fieldset-hint{font-size:11.5px;color:var(--slate-500);margin:-4px 0 10px;font-style:italic;}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eef1f5;}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-row .doc-label{font-size:14px;color:var(--navy-950);}
+  .toggle-row .doc-code{font-size:11px;color:var(--slate-500);font-family:monospace;}
+  .switch{position:relative;width:44px;height:24px;flex:none;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#d7dde5;border-radius:24px;cursor:pointer;transition:.15s;}
+  .slider::before{content:'';position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+  .switch input:checked + .slider{background:var(--green-600);}
+  .switch input:checked + .slider::before{transform:translateX(20px);}
+  .error-text{color:var(--red-600);font-size:12.5px;margin-top:6px;display:none;font-weight:600;}
+  .field.invalid input,.field.invalid select{border-color:var(--red-600);background:var(--red-050);}
+  .field.invalid .error-text{display:block;}
+  .api-tag{display:inline-block;font-family:monospace;font-size:11px;background:var(--navy-950);color:var(--amber-400);padding:2px 8px;border-radius:3px;margin-left:8px;vertical-align:middle;}
+  .actions{display:flex;align-items:center;gap:16px;margin-top:26px;}
+  button.primary{background:var(--amber-500);border:none;color:var(--navy-950);font-weight:700;padding:13px 26px;border-radius:4px;font-size:15px;cursor:pointer;font-family:var(--font-body);}
+  button.primary:hover{background:var(--amber-400);}
+  button.link{background:none;border:none;color:var(--navy-700);text-decoration:underline;cursor:pointer;font-size:13px;padding:0;font-family:var(--font-body);}
+  .banner{border-radius:5px;padding:14px 18px;margin-bottom:20px;font-size:14px;display:none;}
+  .banner.show{display:block;}
+  .banner.error{background:var(--red-050);border:1px solid var(--red-600);color:#7a2226;}
+  .success-panel{display:none;background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--green-600);border-radius:6px;padding:28px;}
+  .success-panel.show{display:block;}
+  .success-panel .claim-id{font-family:monospace;font-size:20px;background:var(--navy-950);color:var(--amber-400);padding:6px 12px;border-radius:4px;display:inline-block;margin:10px 0 18px;}
+  .success-panel .checklist-preview{list-style:none;padding:0;margin:0 0 18px;}
+  .success-panel .checklist-preview li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eef1f5;font-size:14px;}
+  .success-panel .checklist-preview li:last-child{border-bottom:none;}
+  .badge-missing{font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;text-transform:uppercase;background:var(--red-050);color:var(--red-600);}
+  .success-panel a.cta{display:inline-block;background:var(--navy-950);color:#fff;padding:11px 22px;border-radius:4px;text-decoration:none;font-weight:600;font-size:14px;}
+  @media (max-width:480px){
+    .row{grid-template-columns:1fr;}
+    header.top{padding:16px 18px;flex-direction:column;align-items:flex-start;gap:4px;}
+    main{padding:20px 14px 60px;}
+    form{padding:18px;}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="brand">Claim<span>Flow</span></div>
+    <div class="tagline">Horizon Insurance</div>
+  </div>
+  <div class="tagline">X-Role: CUSTOMER</div>
+</header>
+
+<main>
+  <div class="eyebrow">First Notice of Loss</div>
+  <h1>File a new claim</h1>
+  <p class="lede">Tell us what happened. We'll route your claim through document verification, fraud screening and assessment automatically.</p>
+
+  <div id="duplicate-banner" class="banner error" role="alert">
+    <strong>409 — Duplicate claim.</strong> code: <code>DUPLICATE_CLAIM</code>. A claim for this policy_number and incident_date was already submitted. Check your claim tracker instead of re-filing.
+  </div>
+
+  <form id="fnol-form" novalidate>
+    <div class="row">
+      <div class="field" id="field-policy_number">
+        <label for="policy_number">policy_number</label>
+        <input type="text" id="policy_number" name="policy_number" placeholder="POL-MOTOR-0001" value="POL-MOTOR-0001">
+        <div class="error-text">Policy number is required.</div>
+      </div>
+      <div class="field" id="field-incident_date">
+        <label for="incident_date">incident_date</label>
+        <input type="date" id="incident_date" name="incident_date" value="2026-08-29">
+        <div class="error-text">Incident date is required.</div>
+      </div>
+    </div>
+
+    <div class="field" id="field-claim_type">
+      <label>claim_type</label>
+      <div class="claim-type-group">
+        <input type="radio" id="ct-motor" name="claim_type" value="MOTOR" checked>
+        <label for="ct-motor">Motor</label>
+        <input type="radio" id="ct-health" name="claim_type" value="HEALTH">
+        <label for="ct-health">Health</label>
+        <input type="radio" id="ct-life" name="claim_type" value="LIFE">
+        <label for="ct-life">Life</label>
+      </div>
+      <div class="error-text">Select a claim type.</div>
+    </div>
+
+    <div class="field" id="field-claim_amount">
+      <label for="claim_amount">claim_amount (INR)</label>
+      <input type="number" id="claim_amount" name="claim_amount" step="0.01" min="0" placeholder="40000.00" value="42500.00">
+      <div class="hint">Decimal amount you are claiming for this incident. Sent to the API as a decimal string, e.g. "42500.00".</div>
+      <div class="error-text">Claim amount is required.</div>
+    </div>
+
+    <div class="field">
+      <fieldset id="checklist-fieldset">
+        <legend>Documents you'll need — <span id="checklist-type-label">Motor</span></legend>
+        <div class="fieldset-hint">Presentational self-check only — not part of the POST /api/claims request body. The server generates this checklist (as MISSING) after your claim is created.</div>
+        <div id="checklist-motor" class="checklist-group">
+          <div class="toggle-row">
+            <div><div class="doc-label">Police FIR</div><div class="doc-code">POLICE_FIR</div></div>
+            <label class="switch"><input type="checkbox" data-doc="POLICE_FIR"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="doc-label">Repair invoice</div><div class="doc-code">INVOICE</div></div>
+            <label class="switch"><input type="checkbox" data-doc="INVOICE"><span class="slider"></span></label>
+          </div>
+        </div>
+        <div id="checklist-health" class="checklist-group" style="display:none;">
+          <div class="toggle-row">
+            <div><div class="doc-label">Hospital bill</div><div class="doc-code">HOSPITAL_BILL</div></div>
+            <label class="switch"><input type="checkbox" data-doc="HOSPITAL_BILL"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="doc-label">Discharge summary</div><div class="doc-code">DISCHARGE_SUMMARY</div></div>
+            <label class="switch"><input type="checkbox" data-doc="DISCHARGE_SUMMARY"><span class="slider"></span></label>
+          </div>
+        </div>
+        <div id="checklist-life" class="checklist-group" style="display:none;">
+          <div class="toggle-row">
+            <div><div class="doc-label">Death certificate <em style="font-style:normal;color:var(--slate-500);">(inferred — not in stories/contract)</em></div><div class="doc-code">DEATH_CERTIFICATE</div></div>
+            <label class="switch"><input type="checkbox" data-doc="DEATH_CERTIFICATE"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="doc-label">ID proof <em style="font-style:normal;color:var(--slate-500);">(inferred — not in stories/contract)</em></div><div class="doc-code">ID_PROOF</div></div>
+            <label class="switch"><input type="checkbox" data-doc="ID_PROOF"><span class="slider"></span></label>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="primary">Submit claim <span class="api-tag">POST /api/claims</span></button>
+      <button type="button" class="link" id="simulate-duplicate">Simulate duplicate (409)</button>
+    </div>
+  </form>
+
+  <div class="success-panel" id="success-panel">
+    <div class="eyebrow" style="color:#1d5c3c;">201 Created</div>
+    <h1 style="font-size:24px;">Claim submitted</h1>
+    <p>claim_id created with initial status:</p>
+    <div class="claim-id" id="new-claim-id">claim_id: 4402 &middot; status: DOCS_PENDING</div>
+    <p style="font-size:13px;color:var(--slate-700);margin:0 0 8px;">Server-generated checklist:</p>
+    <ul class="checklist-preview" id="server-checklist">
+      <li><span>document_type: POLICE_FIR</span><span class="badge-missing">MISSING</span></li>
+      <li><span>document_type: INVOICE</span><span class="badge-missing">MISSING</span></li>
+    </ul>
+    <div>
+      <a class="cta" id="tracker-link" href="E10-S2.html">Go to claim tracker &rarr;</a>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  var checklists = {MOTOR:'checklist-motor', HEALTH:'checklist-health', LIFE:'checklist-life'};
+  var typeLabels = {MOTOR:'Motor', HEALTH:'Health', LIFE:'Life'};
+  var serverChecklist = {
+    MOTOR: [['POLICE_FIR'], ['INVOICE']],
+    HEALTH: [['HOSPITAL_BILL'], ['DISCHARGE_SUMMARY']],
+    LIFE: [['DEATH_CERTIFICATE'], ['ID_PROOF']]
+  };
+  var radios = document.querySelectorAll('input[name="claim_type"]');
+  radios.forEach(function(r){
+    r.addEventListener('change', function(){
+      Object.values(checklists).forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+      document.getElementById(checklists[r.value]).style.display = 'block';
+      document.getElementById('checklist-type-label').textContent = typeLabels[r.value];
+    });
+  });
+
+  var form = document.getElementById('fnol-form');
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    document.getElementById('duplicate-banner').classList.remove('show');
+    var valid = true;
+    var policy = document.getElementById('policy_number');
+    var date = document.getElementById('incident_date');
+    var amount = document.getElementById('claim_amount');
+
+    toggleInvalid('field-policy_number', !policy.value.trim());
+    toggleInvalid('field-incident_date', !date.value);
+    toggleInvalid('field-claim_amount', !amount.value);
+    if(!policy.value.trim() || !date.value || !amount.value){ valid = false; }
+
+    if(!valid){
+      // Inline validation message shown; NO API call made (E10-S1 AC3).
+      return;
+    }
+
+    // Simulated 201 response from POST /api/claims:
+    // { claim_id: 4402, status: "DOCS_PENDING", checklist: [...] }
+    var claimType = document.querySelector('input[name="claim_type"]:checked').value;
+    var checklistItems = serverChecklist[claimType];
+    var listHtml = checklistItems.map(function(pair){
+      return '<li><span>document_type: '+pair[0]+'</span><span class="badge-missing">MISSING</span></li>';
+    }).join('');
+    document.getElementById('server-checklist').innerHTML = listHtml;
+
+    document.getElementById('fnol-form').style.display = 'none';
+    document.getElementById('success-panel').classList.add('show');
+  });
+
+  function toggleInvalid(fieldId, isInvalid){
+    var el = document.getElementById(fieldId);
+    el.classList.toggle('invalid', !!isInvalid);
+  }
+
+  document.getElementById('simulate-duplicate').addEventListener('click', function(){
+    document.getElementById('duplicate-banner').classList.add('show');
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+})();
+</script>
+</body>
+</html>

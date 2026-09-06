@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<!--
+  Story: E11-S3 — Build the assessor workbench UI
+  Epic: E11 — Internal Portal
+  Depends on: E11-S2, E9-S3 (GET /api/claims/{id}/workbench,
+              POST /api/claims/{id}/decision)
+
+  SCHEMA NOTE: api-contracts.md did not exist when this was authored.
+  Fields (fraud score, breakdown, payable_amount, outcome, reason_code,
+  decided_by) come from E9-S3, E6-S1, E6-S2, E1-S3 (ReasonCode enum).
+  The assessor-facing outcome set is inferred as APPROVE / REJECT (the
+  human counterpart to the engine's AUTO_APPROVE / REJECT outcomes in
+  E6-S2) since no story enumerates the exact assessor-facing outcome
+  strings — flagged as a SCHEMA GAP.
+
+  Self-contained: no CDN, no network calls. Submitting without an outcome
+  is blocked with inline validation (AC3); a successful submit shows a
+  confirmation and removes the claim from the pending list (AC2).
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow Ops — Assessor Workbench</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30; --navy-800:#182842;
+    --amber-500:#e8a33d; --amber-400:#f0b85c; --amber-050:#fbecd3;
+    --slate-100:#f5f7fa; --slate-200:#eaeef3; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --green-600:#2f8f5b; --green-050:#e4f4ea;
+    --red-600:#c14a4f; --red-050:#fbe9ea; --red-700:#8f3438;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:20px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top nav{display:flex;gap:18px;font-size:12.5px;letter-spacing:.04em;}
+  header.top nav a{color:var(--slate-300);text-decoration:none;}
+  header.top nav a.current{color:#fff;border-bottom:2px solid var(--amber-500);padding-bottom:3px;}
+  main{max-width:980px;margin:0 auto;padding:26px 24px 80px;}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--slate-700);font-weight:600;}
+  h1{font-family:var(--font-display);font-size:26px;margin:4px 0 4px;}
+  .api-tag{display:inline-block;font-family:monospace;font-size:11px;background:var(--navy-950);color:var(--amber-400);padding:2px 8px;border-radius:3px;margin-left:8px;}
+  .pending-picker{display:flex;gap:8px;margin:16px 0 20px;flex-wrap:wrap;}
+  .pending-picker button{border:1.5px solid #cdd5e0;background:#fff;padding:7px 14px;border-radius:20px;font-size:12.5px;cursor:pointer;color:var(--navy-800);}
+  .pending-picker button.active{background:var(--navy-950);color:#fff;border-color:var(--navy-950);}
+  .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:20px;}
+  .card{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--navy-900);border-radius:6px;padding:22px;margin-bottom:20px;}
+  .card h2{font-family:var(--font-display);font-size:18px;margin:0 0 14px;}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;margin-bottom:6px;}
+  .meta-item .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate-500);font-weight:700;}
+  .meta-item .v{font-size:14.5px;margin-top:3px;}
+  .score-hero{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;}
+  .score-hero .num{font-family:var(--font-display);font-size:46px;color:var(--red-700);line-height:1;}
+  .score-hero .of{font-size:13px;color:var(--slate-500);}
+  .rules{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .rule-chip{background:var(--red-050);color:var(--red-700);border:1px solid #eec7c8;font-size:11.5px;padding:3px 10px;border-radius:14px;font-family:monospace;}
+  .payable{font-family:var(--font-display);font-size:32px;color:#1d5c3c;margin:6px 0 2px;}
+  .payable-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate-500);font-weight:700;}
+  .breakdown-row{display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--slate-200);}
+  .breakdown-row:last-child{border-bottom:none;font-weight:700;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--navy-800);margin-bottom:7px;}
+  select, textarea{width:100%;padding:10px 12px;border:1.5px solid #cdd5e0;border-radius:4px;font-size:14px;font-family:var(--font-body);background:#fcfdfe;}
+  textarea{min-height:80px;resize:vertical;}
+  .outcome-group{display:flex;gap:10px;}
+  .outcome-group input{position:absolute;opacity:0;pointer-events:none;}
+  .outcome-group label{flex:1;text-align:center;border:1.5px solid #cdd5e0;border-radius:4px;padding:12px 8px;cursor:pointer;font-weight:700;font-size:13px;}
+  .outcome-group input[value=APPROVE] + label{color:var(--green-600);}
+  .outcome-group input[value=REJECT] + label{color:var(--red-600);}
+  .outcome-group input:checked + label{background:var(--navy-950);color:#fff !important;border-color:var(--navy-950);}
+  .error-text{color:var(--red-600);font-size:12.5px;margin-top:6px;display:none;font-weight:600;}
+  .field.invalid .error-text{display:block;}
+  .field.invalid .outcome-group label{border-color:var(--red-600);}
+  button.primary{background:var(--amber-500);border:none;color:var(--navy-950);font-weight:700;padding:12px 24px;border-radius:4px;font-size:14.5px;cursor:pointer;width:100%;}
+  .confirmation{display:none;background:var(--green-050);border:1px solid var(--green-600);border-radius:6px;padding:18px 20px;color:#1d5c3c;margin-top:14px;}
+  .confirmation.show{display:block;}
+  .empty-state{background:#fff;border:1px dashed var(--slate-500);border-radius:6px;padding:48px 26px;text-align:center;color:var(--slate-700);}
+  @media (max-width:800px){ .grid{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div><div class="brand">Claim<span>Flow</span> Ops</div></div>
+  <nav>
+    <a href="E11-S1.html">Document Queue</a>
+    <a href="E11-S2.html">Fraud Alerts</a>
+    <a href="E11-S3.html" class="current">Workbench</a>
+    <a href="E11-S4.html">Admin</a>
+  </nav>
+  <div style="font-size:11px;color:var(--slate-300);">X-Role: ASSESSOR</div>
+</header>
+
+<main>
+  <div class="eyebrow">Internal Portal</div>
+  <h1>Assessor workbench <span class="api-tag">GET /api/claims/{id}/workbench</span></h1>
+
+  <div class="pending-picker">
+    <button class="active" data-claim="CLM-2026-07715">CLM-2026-07715</button>
+    <button data-claim="CLM-2026-07850">CLM-2026-07850</button>
+  </div>
+
+  <div id="workbench-content">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>Claim summary</h2>
+          <div class="meta-grid">
+            <div class="meta-item"><div class="k">Claim ID</div><div class="v" id="wb-claim-id">CLM-2026-07715</div></div>
+            <div class="meta-item"><div class="k">Status</div><div class="v">MANUAL_REVIEW</div></div>
+            <div class="meta-item"><div class="k">Policy number</div><div class="v" id="wb-policy">POL-2026-009944</div></div>
+            <div class="meta-item"><div class="k">Claim type</div><div class="v" id="wb-type">HEALTH</div></div>
+            <div class="meta-item"><div class="k">Claim amount</div><div class="v" id="wb-amount">&#8377;78,000.00</div></div>
+            <div class="meta-item"><div class="k">Sum insured</div><div class="v" id="wb-sum-insured">&#8377;150,000.00</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Fraud screening</h2>
+          <div class="score-hero"><span class="num" id="wb-score">65</span><span class="of">/ 60 threshold &middot; flagged</span></div>
+          <div class="rules" id="wb-rules">
+            <span class="rule-chip">HIGH_CLAIM_RATIO +40</span>
+            <span class="rule-chip">EARLY_FILING +25</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Assessment</h2>
+          <div class="payable-label">Computed payable_amount</div>
+          <div class="payable" id="wb-payable">&#8377;17,100.00</div>
+          <div class="breakdown-row"><span>Claim amount</span><span id="bd-claim-amount">&#8377;78,000.00</span></div>
+          <div class="breakdown-row"><span>Deductible</span><span id="bd-deductible">-&#8377;1,000.00</span></div>
+          <div class="breakdown-row"><span>Co-pay (10%)</span><span id="bd-copay">-&#8377;7,700.00</span></div>
+          <div class="breakdown-row"><span>Payable amount</span><span id="bd-payable">&#8377;17,100.00</span></div>
+        </div>
+
+        <div class="card">
+          <h2>Submit decision <span class="api-tag">POST /api/claims/{id}/decision</span></h2>
+          <form id="decision-form">
+            <div class="field" id="field-outcome">
+              <label>Outcome</label>
+              <div class="outcome-group">
+                <input type="radio" id="oc-approve" name="outcome" value="APPROVE">
+                <label for="oc-approve">Approve</label>
+                <input type="radio" id="oc-reject" name="outcome" value="REJECT">
+                <label for="oc-reject">Reject</label>
+              </div>
+              <div class="error-text">Select an outcome before submitting.</div>
+            </div>
+            <div class="field">
+              <label for="reason-code">Reason code</label>
+              <select id="reason-code">
+                <option value="HIGH_VALUE_REVIEW">HIGH_VALUE_REVIEW</option>
+                <option value="FRAUD_FLAG">FRAUD_FLAG</option>
+                <option value="ZERO_PAYABLE_AMOUNT">ZERO_PAYABLE_AMOUNT</option>
+                <option value="DOCS_INCOMPLETE">DOCS_INCOMPLETE</option>
+                <option value="POLICY_INACTIVE">POLICY_INACTIVE</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="rationale">Decision rationale (assessor notes)</label>
+              <textarea id="rationale" placeholder="Fraud score exceeds threshold on early filing and high claim ratio; documents otherwise complete...">Score exceeds threshold (65/60) primarily on early filing + high claim ratio. Documents complete and consistent with hospital bill. Recommend approve at computed payable amount.</textarea>
+            </div>
+            <button type="submit" class="primary">Submit decision</button>
+          </form>
+          <div class="confirmation" id="confirmation">
+            <strong>200 OK.</strong> Decision recorded. decided_by: <code>assessor-priya.rao</code>. Claim removed from the pending workbench list.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" id="empty-state" style="display:none;">
+    No claims currently pending in your workbench queue.
+  </div>
+</main>
+
+<script>
+(function(){
+  var data = {
+    'CLM-2026-07715': {
+      policy:'POL-2026-009944', type:'HEALTH', amount:'&#8377;78,000.00', sumInsured:'&#8377;150,000.00',
+      score:'65', rules:['HIGH_CLAIM_RATIO +40','EARLY_FILING +25'],
+      claimAmount:'&#8377;78,000.00', deductible:'-&#8377;1,000.00', copay:'-&#8377;7,700.00', payable:'&#8377;17,100.00'
+    },
+    'CLM-2026-07850': {
+      policy:'POL-2026-005112', type:'MOTOR', amount:'&#8377;90,000.00', sumInsured:'&#8377;120,000.00',
+      score:'70', rules:['HIGH_CLAIM_RATIO +40','MOTOR_MISSING_FIR +15','ROUND_NUMBER_AMOUNT +10'],
+      claimAmount:'&#8377;90,000.00', deductible:'-&#8377;5,000.00', copay:'&#8377;0.00', payable:'&#8377;85,000.00'
+    }
+  };
+
+  var buttons = document.querySelectorAll('.pending-picker button');
+  buttons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      buttons.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      loadClaim(btn.dataset.claim);
+    });
+  });
+
+  function loadClaim(claimId){
+    var d = data[claimId];
+    document.getElementById('workbench-content').style.display = 'block';
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('confirmation').classList.remove('show');
+    document.getElementById('decision-form').style.display = 'block';
+    document.getElementById('wb-claim-id').textContent = claimId;
+    document.getElementById('wb-policy').textContent = d.policy;
+    document.getElementById('wb-type').textContent = d.type;
+    document.getElementById('wb-amount').innerHTML = d.amount;
+    document.getElementById('wb-sum-insured').innerHTML = d.sumInsured;
+    document.getElementById('wb-score').textContent = d.score;
+    document.getElementById('wb-rules').innerHTML = d.rules.map(function(r){ return '<span class="rule-chip">'+r+'</span>'; }).join('');
+    document.getElementById('wb-payable').innerHTML = d.payable;
+    document.getElementById('bd-claim-amount').innerHTML = d.claimAmount;
+    document.getElementById('bd-deductible').innerHTML = d.deductible;
+    document.getElementById('bd-copay').innerHTML = d.copay;
+    document.getElementById('bd-payable').innerHTML = d.payable;
+  }
+  loadClaim('CLM-2026-07715');
+
+  document.getElementById('decision-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var outcomeSelected = document.querySelector('input[name="outcome"]:checked');
+    var field = document.getElementById('field-outcome');
+    if(!outcomeSelected){
+      field.classList.add('invalid');
+      return; // blocked, no API call
+    }
+    field.classList.remove('invalid');
+    document.getElementById('confirmation').classList.add('show');
+    document.getElementById('decision-form').style.display = 'none';
+
+    // Remove this claim from the pending picker (E11-S3 AC2)
+    var activeBtn = document.querySelector('.pending-picker button.active');
+    var claimId = activeBtn.dataset.claim;
+    setTimeout(function(){
+      activeBtn.remove();
+      delete data[claimId];
+      var remaining = document.querySelectorAll('.pending-picker button');
+      if(remaining.length > 0){
+        remaining[0].classList.add('active');
+        loadClaim(remaining[0].dataset.claim);
+      } else {
+        document.getElementById('workbench-content').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'block';
+      }
+    }, 1400);
+  });
+})();
+</script>
+</body>
+</html>

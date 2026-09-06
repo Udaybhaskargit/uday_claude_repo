@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!--
+  Story: E10-S3 — Build the dispute action flow
+  Epic: E10 — Customer Portal
+  Depends on: E10-S2, E9-S1 (POST /api/claims/{id}/reopen)
+
+  RECONCILED against specs/design/api-contracts.md (confirmed present).
+  POST /api/claims/{id}/reopen request body: none required. Success
+  response (201): { sub_claim_id (integer), parent_claim_id (integer),
+  status: "INTAKE" }. Failure: 409 { error: { code: "INVALID_STATE_TRANSITION",
+  message, details } }.
+
+  Self-contained: no CDN, no network calls. Confirmation dialog + two
+  simulated outcomes (201 success, 409 invalid-state failure) are wired
+  with vanilla JS only.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow — Dispute Claim</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30;
+    --amber-500:#e8a33d; --amber-400:#f0b85c;
+    --slate-100:#f5f7fa; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --green-600:#2f8f5b; --green-050:#e4f4ea;
+    --red-600:#c14a4f; --red-050:#fbe9ea;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:22px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top .tagline{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:var(--slate-300);}
+  main{max-width:680px;margin:0 auto;padding:28px 20px 80px;}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--slate-700);font-weight:600;}
+  h1{font-family:var(--font-display);font-size:28px;margin:6px 0 18px;}
+  .api-tag{display:inline-block;font-family:monospace;font-size:11px;background:var(--navy-950);color:var(--amber-400);padding:2px 8px;border-radius:3px;margin-left:8px;}
+  .card{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--navy-900);border-radius:6px;padding:26px;margin-bottom:20px;}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;}
+  .meta-item .k{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate-500);font-weight:700;}
+  .meta-item .v{font-size:15px;margin-top:3px;}
+  .pill{display:inline-block;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--green-050);color:#1d5c3c;}
+  button.dispute{background:var(--red-600);color:#fff;border:none;padding:12px 22px;border-radius:4px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-top:8px;}
+  .banner{border-radius:5px;padding:14px 18px;margin-top:18px;font-size:14px;display:none;}
+  .banner.show{display:block;}
+  .banner.error{background:var(--red-050);border:1px solid var(--red-600);color:#7a2226;}
+  .banner.success{background:var(--green-050);border:1px solid var(--green-600);color:#1d5c3c;}
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(10,18,31,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:10;}
+  .overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:6px;max-width:420px;width:100%;padding:26px;border-top:5px solid var(--red-600);}
+  .modal h2{font-family:var(--font-display);font-size:20px;margin:0 0 10px;}
+  .modal p{font-size:14px;color:var(--slate-700);line-height:1.5;}
+  .modal .actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+  .modal button{padding:10px 18px;border-radius:4px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-body);}
+  .modal button.cancel{background:#eef1f5;color:var(--navy-900);}
+  .modal button.confirm{background:var(--red-600);color:#fff;}
+  .result-card{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--green-600);border-radius:6px;padding:26px;display:none;}
+  .result-card.show{display:block;}
+  .result-card .claim-id{font-family:monospace;font-size:18px;background:var(--navy-950);color:var(--amber-400);padding:6px 12px;border-radius:4px;display:inline-block;margin:10px 0 16px;}
+  .result-card a.cta{display:inline-block;background:var(--navy-950);color:#fff;padding:10px 20px;border-radius:4px;text-decoration:none;font-weight:600;font-size:14px;}
+  .demo-toggle{font-size:12.5px;color:var(--slate-700);margin-top:6px;}
+  .demo-toggle label{cursor:pointer;}
+  @media (max-width:480px){
+    .meta-grid{grid-template-columns:1fr;}
+    header.top{padding:16px 18px;flex-direction:column;align-items:flex-start;gap:4px;}
+    main{padding:20px 14px 60px;}
+    .card{padding:18px;}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="brand">Claim<span>Flow</span></div>
+    <div class="tagline">Horizon Insurance</div>
+  </div>
+  <div class="tagline">X-Role: CUSTOMER</div>
+</header>
+
+<main>
+  <div class="eyebrow">Dispute Flow</div>
+  <h1>Dispute a settled claim</h1>
+
+  <div class="card" id="original-card">
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">claim_id</div><div class="v">4106</div></div>
+      <div class="meta-item"><div class="k">status</div><div class="v"><span class="pill" id="original-status-pill">SETTLED</span></div></div>
+      <div class="meta-item"><div class="k">claim_type</div><div class="v">MOTOR</div></div>
+      <div class="meta-item"><div class="k">settlement.payout_amount</div><div class="v">&#8377;35,000.00</div></div>
+    </div>
+    <button class="dispute" id="open-dispute">Dispute this claim <span class="api-tag" style="background:#7a2226;">POST /api/claims/{id}/reopen</span></button>
+    <div class="demo-toggle">
+      <label><input type="checkbox" id="force-fail"> Demo: simulate 409 failure response</label>
+    </div>
+    <div class="banner error" id="fail-banner">
+      <strong>409 — INVALID_STATE_TRANSITION.</strong> This claim cannot be reopened in its current state. The original claim's status remains unchanged.
+    </div>
+  </div>
+
+  <div class="result-card" id="result-card">
+    <div class="eyebrow" style="color:#1d5c3c;">201 Created</div>
+    <h2 style="font-family:var(--font-display);margin:6px 0;">New sub-claim created</h2>
+    <p style="color:var(--slate-700);font-size:14px;">parent_claim_id: <code>4106</code> &middot; status: <code>INTAKE</code></p>
+    <div class="claim-id" id="new-subclaim-id">sub_claim_id: 4488</div>
+    <div><a class="cta" href="E10-S2.html">View new claim tracker &rarr;</a></div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Confirm dispute</h2>
+    <p>This will reopen claim_id <strong>4106</strong> and create a new linked claim for review. This action cannot be undone. Do you want to continue?</p>
+    <div class="actions">
+      <button class="cancel" id="modal-cancel">Cancel</button>
+      <button class="confirm" id="modal-confirm">Confirm dispute</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('overlay');
+  document.getElementById('open-dispute').addEventListener('click', function(){
+    document.getElementById('fail-banner').classList.remove('show');
+    document.getElementById('result-card').classList.remove('show');
+    overlay.classList.add('show');
+  });
+  document.getElementById('modal-cancel').addEventListener('click', function(){
+    overlay.classList.remove('show');
+  });
+  document.getElementById('modal-confirm').addEventListener('click', function(){
+    overlay.classList.remove('show');
+    var forceFail = document.getElementById('force-fail').checked;
+    if(forceFail){
+      document.getElementById('fail-banner').classList.add('show');
+      // Original claim's displayed status is unchanged.
+      document.getElementById('original-status-pill').textContent = 'SETTLED';
+    } else {
+      document.getElementById('result-card').classList.add('show');
+    }
+  });
+})();
+</script>
+</body>
+</html>

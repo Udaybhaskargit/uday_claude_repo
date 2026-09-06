@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<!--
+  Story: E10-S2 — Build the claim tracker view
+  Epic: E10 — Customer Portal
+  Depends on: E9-S1 (GET /api/claims/{id})
+
+  RECONCILED against specs/design/api-contracts.md (confirmed present).
+  GET /api/claims/{id} response shape:
+  { claim_id (integer), claim_type, status, incident_date, claim_amount,
+    missing_documents: [document_type,...], decision: {outcome, reason_code,
+    decided_by, created_at} | null, settlement: {payout_amount, ...} | null,
+    parent_claim_id }.
+
+  SCHEMA NOTE: the contract does NOT return policy_number on this endpoint,
+  so it has been removed from this view (it was shown in an earlier pass
+  before api-contracts.md existed — dropped now for fidelity). The contract
+  also only returns `missing_documents` (a flat list), not a full
+  verified-vs-missing checklist. To satisfy E10-S2 AC1 ("lists each
+  outstanding document type distinctly from verified ones"), this mockup
+  derives "verified" client-side as (full per-claim_type checklist) minus
+  missing_documents — the full checklist itself is UI-side static knowledge
+  (E5-S1), not a field returned by this endpoint. Human-readable reason
+  text for each ReasonCode is UI presentation logic, not a schema field.
+
+  Self-contained: no CDN, no network calls.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow — Claim Tracker</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30; --navy-800:#182842;
+    --amber-500:#e8a33d; --amber-400:#f0b85c; --amber-050:#fbecd3;
+    --slate-100:#f5f7fa; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --green-600:#2f8f5b; --green-050:#e4f4ea;
+    --red-600:#c14a4f; --red-050:#fbe9ea;
+    --blue-600:#3a6ea5; --blue-050:#e6eef7;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:22px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top .tagline{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:var(--slate-300);}
+  main{max-width:760px;margin:0 auto;padding:28px 20px 80px;}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--slate-700);font-weight:600;}
+  h1{font-family:var(--font-display);font-size:28px;margin:6px 0 18px;}
+  .picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;}
+  .picker button{
+    border:1.5px solid #cdd5e0;background:#fff;padding:8px 14px;border-radius:20px;font-size:12.5px;cursor:pointer;font-family:var(--font-body);color:var(--navy-800);
+  }
+  .picker button.active{background:var(--navy-950);color:#fff;border-color:var(--navy-950);}
+  .api-tag{display:inline-block;font-family:monospace;font-size:11px;background:var(--navy-950);color:var(--amber-400);padding:2px 8px;border-radius:3px;margin-left:8px;}
+  .card{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--navy-900);border-radius:6px;padding:26px;margin-bottom:20px;}
+  .card h2{font-family:var(--font-display);font-size:19px;margin:0 0 14px;}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;margin-bottom:6px;}
+  .meta-item .k{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate-500);font-weight:700;}
+  .meta-item .v{font-size:15px;margin-top:3px;}
+  .pill{display:inline-block;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+  .pill-INTAKE{background:var(--blue-050);color:var(--blue-600);}
+  .pill-DOCS_PENDING{background:var(--amber-050);color:#8a5a12;}
+  .pill-FRAUD_SCREENING{background:#f1e6fb;color:#6c3fa8;}
+  .pill-ASSESSMENT{background:var(--blue-050);color:var(--blue-600);}
+  .pill-AUTO_APPROVED{background:var(--green-050);color:var(--green-600);}
+  .pill-MANUAL_REVIEW{background:var(--amber-050);color:#8a5a12;}
+  .pill-REJECTED{background:var(--red-050);color:var(--red-600);}
+  .pill-SETTLED{background:var(--green-050);color:#1d5c3c;}
+  .pill-REOPENED{background:#f1e6fb;color:#6c3fa8;}
+  .pill-PROCESSING_FAILED{background:var(--red-050);color:var(--red-600);}
+  .doc-list{list-style:none;padding:0;margin:0;}
+  .doc-list li{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eef1f5;font-size:14px;}
+  .doc-list li:last-child{border-bottom:none;}
+  .doc-list .code{font-family:monospace;font-size:11px;color:var(--slate-500);}
+  .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;text-transform:uppercase;}
+  .badge-verified{background:var(--green-050);color:var(--green-600);}
+  .badge-outstanding{background:var(--red-050);color:var(--red-600);}
+  .reason-box{background:var(--amber-050);border:1px solid var(--amber-400);border-radius:5px;padding:14px 16px;margin-top:8px;}
+  .reason-box .code{font-family:monospace;font-size:11px;color:#8a5a12;margin-bottom:4px;}
+  .reason-box .text{font-size:14.5px;color:#5a3c0c;}
+  .payout{font-family:var(--font-display);font-size:30px;color:#1d5c3c;margin:4px 0 2px;}
+  .payout-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--slate-500);font-weight:700;}
+  button.dispute{background:var(--red-600);color:#fff;border:none;padding:12px 22px;border-radius:4px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font-body);margin-top:16px;}
+  .not-found{background:#fff;border:1px dashed var(--red-600);border-radius:6px;padding:40px 26px;text-align:center;}
+  .not-found h2{font-family:var(--font-display);color:var(--red-600);margin-top:0;}
+  @media (max-width:480px){
+    .meta-grid{grid-template-columns:1fr;}
+    header.top{padding:16px 18px;flex-direction:column;align-items:flex-start;gap:4px;}
+    main{padding:20px 14px 60px;}
+    .card{padding:18px;}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="brand">Claim<span>Flow</span></div>
+    <div class="tagline">Horizon Insurance</div>
+  </div>
+  <div class="tagline">X-Role: CUSTOMER</div>
+</header>
+
+<main>
+  <div class="eyebrow">Claim Tracker <span class="api-tag">GET /api/claims/{id}</span></div>
+  <h1>Track your claim</h1>
+
+  <div class="picker" role="tablist" aria-label="Demo claim states">
+    <button data-state="docs_pending" class="active">claim_id 4231 (Docs pending)</button>
+    <button data-state="manual_review">claim_id 4287 (Manual review)</button>
+    <button data-state="settled">claim_id 4106 (Settled)</button>
+    <button data-state="not_found">claim_id 999999 (Not found)</button>
+  </div>
+
+  <!-- DOCS_PENDING state -->
+  <div class="state-block" id="state-docs_pending">
+    <div class="card">
+      <div class="meta-grid">
+        <div class="meta-item"><div class="k">claim_id</div><div class="v">4231</div></div>
+        <div class="meta-item"><div class="k">status</div><div class="v"><span class="pill pill-DOCS_PENDING">DOCS_PENDING</span></div></div>
+        <div class="meta-item"><div class="k">claim_type</div><div class="v">MOTOR</div></div>
+        <div class="meta-item"><div class="k">incident_date</div><div class="v">2026-08-29</div></div>
+        <div class="meta-item"><div class="k">claim_amount</div><div class="v">&#8377;42,500.00</div></div>
+        <div class="meta-item"><div class="k">parent_claim_id</div><div class="v">null</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Documents <span style="font-size:11px;color:var(--slate-500);font-weight:400;">(derived from missing_documents: ["POLICE_FIR"])</span></h2>
+      <ul class="doc-list">
+        <li><span>Repair invoice <span class="code">INVOICE</span></span><span class="badge badge-verified">Verified</span></li>
+        <li><span>Police FIR <span class="code">POLICE_FIR</span></span><span class="badge badge-outstanding">Outstanding</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- MANUAL_REVIEW state -->
+  <div class="state-block" id="state-manual_review" style="display:none;">
+    <div class="card">
+      <div class="meta-grid">
+        <div class="meta-item"><div class="k">claim_id</div><div class="v">4287</div></div>
+        <div class="meta-item"><div class="k">status</div><div class="v"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></div></div>
+        <div class="meta-item"><div class="k">claim_type</div><div class="v">HEALTH</div></div>
+        <div class="meta-item"><div class="k">incident_date</div><div class="v">2026-08-14</div></div>
+        <div class="meta-item"><div class="k">claim_amount</div><div class="v">&#8377;78,000.00</div></div>
+        <div class="meta-item"><div class="k">parent_claim_id</div><div class="v">null</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>decision</h2>
+      <div class="reason-box">
+        <div class="code">decision.outcome: MANUAL_REVIEW &middot; decision.reason_code: HIGH_VALUE_REVIEW &middot; decided_by: system</div>
+        <div class="text">Your claim amount exceeds the automatic-approval limit, so it has been routed to an assessor for manual review.</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Documents <span style="font-size:11px;color:var(--slate-500);font-weight:400;">(missing_documents: [])</span></h2>
+      <ul class="doc-list">
+        <li><span>Hospital bill <span class="code">HOSPITAL_BILL</span></span><span class="badge badge-verified">Verified</span></li>
+        <li><span>Discharge summary <span class="code">DISCHARGE_SUMMARY</span></span><span class="badge badge-verified">Verified</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SETTLED state -->
+  <div class="state-block" id="state-settled" style="display:none;">
+    <div class="card">
+      <div class="meta-grid">
+        <div class="meta-item"><div class="k">claim_id</div><div class="v">4106</div></div>
+        <div class="meta-item"><div class="k">status</div><div class="v"><span class="pill pill-SETTLED">SETTLED</span></div></div>
+        <div class="meta-item"><div class="k">claim_type</div><div class="v">MOTOR</div></div>
+        <div class="meta-item"><div class="k">incident_date</div><div class="v">2026-07-02</div></div>
+        <div class="meta-item"><div class="k">claim_amount</div><div class="v">&#8377;40,000.00</div></div>
+        <div class="meta-item"><div class="k">parent_claim_id</div><div class="v">null</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>decision</h2>
+      <div class="reason-box" style="background:var(--green-050);border-color:var(--green-600);">
+        <div class="code" style="color:#1d5c3c;">decision.outcome: AUTO_APPROVE &middot; decision.reason_code: AUTO_APPROVED_LOW_RISK &middot; decided_by: system</div>
+        <div class="text" style="color:#1d5c3c;">Your claim was automatically approved as low risk.</div>
+      </div>
+      <div class="payout-label" style="margin-top:18px;">settlement.payout_amount</div>
+      <div class="payout">&#8377;35,000.00</div>
+      <div style="font-size:12px;color:var(--slate-500);">payment_reference: STUB-PAY-0000004106-01</div>
+      <button class="dispute" id="dispute-btn">Dispute this claim <span class="api-tag" style="background:#7a2226;">POST /api/claims/{id}/reopen</span></button>
+    </div>
+  </div>
+
+  <!-- NOT FOUND / error state -->
+  <div class="state-block" id="state-not_found" style="display:none;">
+    <div class="not-found">
+      <h2>404 — NOT_FOUND</h2>
+      <p>We couldn't find a claim matching claim_id 999999. Check the claim ID and try again.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  var buttons = document.querySelectorAll('.picker button');
+  var blocks = document.querySelectorAll('.state-block');
+  buttons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      buttons.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      blocks.forEach(function(b){ b.style.display = 'none'; });
+      document.getElementById('state-' + btn.dataset.state).style.display = 'block';
+    });
+  });
+  var disputeBtn = document.getElementById('dispute-btn');
+  if(disputeBtn){
+    disputeBtn.addEventListener('click', function(){
+      window.location.href = 'E10-S3.html';
+    });
+  }
+})();
+</script>
+</body>
+</html>

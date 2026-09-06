@@ -1,0 +1,32 @@
+=== Session 0 ===
+date: 2026-09-06T16:40:26Z
+mode: full
+groups_completed: []
+groups_remaining: []
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: none
+features_passing: 0 / 0
+coverage: 0%
+learned_rules: 0
+blocked_stories: none
+next_action: Run /brd to start
+
+=== Session 1 ===
+date: 2026-09-06
+mode: full
+brd: approved (specs/brd/brd.md)
+spec: complete, pending human review — 11 epics / 34 stories / 130 features
+groups_completed: []
+groups_remaining: [A, B, C, D, E, F, G, H, I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: none
+features_passing: 0 / 130
+coverage: 0%
+learned_rules: 0
+blocked_stories: none
+notes: features.json consolidated to repo root (spec/SKILL.md corrected from specs/features.json)
+next_action: Human review of specs/stories/dependency-graph.md and epic/story decomposition, then /design

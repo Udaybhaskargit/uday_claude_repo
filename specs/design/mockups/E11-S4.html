@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<!--
+  Story: E11-S4 — Build the admin dashboard UI
+  Epic: E11 — Internal Portal
+  Depends on: E9-S4 (GET /api/admin/claims, GET /api/admin/payouts,
+              POST /api/admin/claims/{id}/override,
+              GET /api/admin/claims/{id}/overrides)
+
+  SCHEMA NOTE: api-contracts.md did not exist when this was authored.
+  Fields (status, product/claim_type, Settlement claim id/amount/timestamp,
+  AdminOverride admin actor/command/reason_code/timestamp) come from
+  E9-S4 and E8-S2. The exact set of valid "command" values for an override
+  (e.g. FORCE_APPROVE, FORCE_REJECT, FORCE_STATUS) is not enumerated in
+  any story — flagged as a SCHEMA GAP; this mockup uses a free-text command
+  field plus a target-status select as a plausible interpretation.
+
+  Self-contained: no CDN, no network calls. Status/product filters update
+  the table client-side without reload (AC1). Payout audit trail is
+  reverse-chronological and read-only, with no edit controls (AC2).
+  Override submission without a reason code is blocked (AC3); a successful
+  override appends a new row to that claim's audit history (AC4).
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow Ops — Admin Dashboard</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30; --navy-800:#182842;
+    --amber-500:#e8a33d; --amber-400:#f0b85c; --amber-050:#fbecd3;
+    --slate-100:#f5f7fa; --slate-200:#eaeef3; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --green-600:#2f8f5b; --green-050:#e4f4ea;
+    --red-600:#c14a4f; --red-050:#fbe9ea;
+    --blue-600:#3a6ea5; --blue-050:#e6eef7;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:20px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top nav{display:flex;gap:18px;font-size:12.5px;letter-spacing:.04em;}
+  header.top nav a{color:var(--slate-300);text-decoration:none;}
+  header.top nav a.current{color:#fff;border-bottom:2px solid var(--amber-500);padding-bottom:3px;}
+  main{max-width:1200px;margin:0 auto;padding:26px 24px 90px;}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--slate-700);font-weight:600;}
+  h1{font-family:var(--font-display);font-size:26px;margin:4px 0 4px;}
+  .api-tag{display:inline-block;font-family:monospace;font-size:11px;background:var(--navy-950);color:var(--amber-400);padding:2px 8px;border-radius:3px;margin-left:8px;}
+  section{margin-top:30px;}
+  section h2{font-family:var(--font-display);font-size:19px;margin:0 0 12px;}
+  .filters-bar{display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:14px;}
+  .filters-bar .f{display:flex;flex-direction:column;gap:5px;}
+  .filters-bar label{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-500);font-weight:700;}
+  .filters-bar select{padding:8px 10px;border:1.5px solid #cdd5e0;border-radius:4px;font-size:13px;background:#fff;font-family:var(--font-body);}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e1e6ee;border-radius:6px;overflow:hidden;}
+  thead th{background:var(--navy-950);color:var(--slate-300);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:11px 14px;font-weight:600;}
+  tbody td{padding:12px 14px;border-bottom:1px solid var(--slate-200);font-size:13.5px;}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;}
+  .pill-MANUAL_REVIEW{background:var(--amber-050);color:#8a5a12;}
+  .pill-DOCS_PENDING{background:var(--amber-050);color:#8a5a12;}
+  .pill-FRAUD_SCREENING{background:#f1e6fb;color:#6c3fa8;}
+  .pill-AUTO_APPROVED{background:var(--green-050);color:var(--green-600);}
+  .pill-SETTLED{background:var(--green-050);color:#1d5c3c;}
+  .pill-REJECTED{background:var(--red-050);color:var(--red-600);}
+  .pill-PROCESSING_FAILED{background:var(--red-050);color:var(--red-600);}
+  .readonly-badge{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--slate-500);background:var(--slate-200);padding:3px 9px;border-radius:12px;font-weight:700;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .card{background:#fff;border:1px solid #e1e6ee;border-left:5px solid var(--navy-900);border-radius:6px;padding:22px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;color:var(--navy-800);margin-bottom:7px;}
+  select, input[type=text]{width:100%;padding:9px 11px;border:1.5px solid #cdd5e0;border-radius:4px;font-size:13.5px;font-family:var(--font-body);background:#fcfdfe;}
+  .error-text{color:var(--red-600);font-size:12px;margin-top:6px;display:none;font-weight:600;}
+  .field.invalid select, .field.invalid input{border-color:var(--red-600);background:var(--red-050);}
+  .field.invalid .error-text{display:block;}
+  button.primary{background:var(--amber-500);border:none;color:var(--navy-950);font-weight:700;padding:11px 22px;border-radius:4px;font-size:13.5px;cursor:pointer;}
+  .confirmation{display:none;background:var(--green-050);border:1px solid var(--green-600);border-radius:5px;padding:12px 16px;margin-top:14px;font-size:13px;color:#1d5c3c;}
+  .confirmation.show{display:block;}
+  .empty-state{background:#fff;border:1px dashed var(--slate-500);border-radius:6px;padding:36px 26px;text-align:center;color:var(--slate-700);font-size:13.5px;}
+  @media (max-width:900px){ .grid2{grid-template-columns:1fr;} }
+  @media (max-width:600px){
+    table, thead, tbody, th, td, tr{display:block;}
+    thead{display:none;}
+    tbody tr{margin-bottom:12px;border:1px solid var(--slate-200);border-radius:6px;}
+    tbody td::before{content:attr(data-label);display:block;font-size:10px;text-transform:uppercase;color:var(--slate-500);font-weight:700;margin-bottom:3px;}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div><div class="brand">Claim<span>Flow</span> Ops</div></div>
+  <nav>
+    <a href="E11-S1.html">Document Queue</a>
+    <a href="E11-S2.html">Fraud Alerts</a>
+    <a href="E11-S3.html">Workbench</a>
+    <a href="E11-S4.html" class="current">Admin</a>
+  </nav>
+  <div style="font-size:11px;color:var(--slate-300);">X-Role: ADMIN</div>
+</header>
+
+<main>
+  <div class="eyebrow">Internal Portal</div>
+  <h1>Admin dashboard</h1>
+
+  <section>
+    <h2>Claim queue <span class="api-tag">GET /api/admin/claims?status=&amp;product=</span></h2>
+    <div class="filters-bar">
+      <div class="f">
+        <label for="filter-status">Status</label>
+        <select id="filter-status">
+          <option value="ALL">All statuses</option>
+          <option value="DOCS_PENDING">DOCS_PENDING</option>
+          <option value="FRAUD_SCREENING">FRAUD_SCREENING</option>
+          <option value="MANUAL_REVIEW">MANUAL_REVIEW</option>
+          <option value="AUTO_APPROVED">AUTO_APPROVED</option>
+          <option value="SETTLED">SETTLED</option>
+          <option value="REJECTED">REJECTED</option>
+          <option value="PROCESSING_FAILED">PROCESSING_FAILED</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="filter-product">Product (claim_type)</label>
+        <select id="filter-product">
+          <option value="ALL">All products</option>
+          <option value="MOTOR">MOTOR</option>
+          <option value="HEALTH">HEALTH</option>
+          <option value="LIFE">LIFE</option>
+        </select>
+      </div>
+    </div>
+    <table id="claims-table">
+      <thead><tr><th>Claim ID</th><th>Policy number</th><th>Claim type</th><th>Status</th><th>Claim amount</th></tr></thead>
+      <tbody id="claims-body">
+        <tr data-status="MANUAL_REVIEW" data-product="HEALTH">
+          <td data-label="Claim ID">CLM-2026-07715</td><td data-label="Policy">POL-2026-009944</td><td data-label="Type">HEALTH</td>
+          <td data-label="Status"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></td><td data-label="Amount">&#8377;78,000.00</td>
+        </tr>
+        <tr data-status="MANUAL_REVIEW" data-product="MOTOR">
+          <td data-label="Claim ID">CLM-2026-07850</td><td data-label="Policy">POL-2026-005112</td><td data-label="Type">MOTOR</td>
+          <td data-label="Status"><span class="pill pill-MANUAL_REVIEW">MANUAL_REVIEW</span></td><td data-label="Amount">&#8377;90,000.00</td>
+        </tr>
+        <tr data-status="DOCS_PENDING" data-product="MOTOR">
+          <td data-label="Claim ID">CLM-2026-07721</td><td data-label="Policy">POL-2026-004821</td><td data-label="Type">MOTOR</td>
+          <td data-label="Status"><span class="pill pill-DOCS_PENDING">DOCS_PENDING</span></td><td data-label="Amount">&#8377;42,500.00</td>
+        </tr>
+        <tr data-status="SETTLED" data-product="MOTOR">
+          <td data-label="Claim ID">CLM-2026-07690</td><td data-label="Policy">POL-2026-002210</td><td data-label="Type">MOTOR</td>
+          <td data-label="Status"><span class="pill pill-SETTLED">SETTLED</span></td><td data-label="Amount">&#8377;40,000.00</td>
+        </tr>
+        <tr data-status="PROCESSING_FAILED" data-product="LIFE">
+          <td data-label="Claim ID">CLM-2026-07960</td><td data-label="Policy">POL-2026-013305</td><td data-label="Type">LIFE</td>
+          <td data-label="Status"><span class="pill pill-PROCESSING_FAILED">PROCESSING_FAILED</span></td><td data-label="Amount">&#8377;150,000.00</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="empty-state" id="claims-empty" style="display:none;margin-top:12px;">No claims match the selected filters.</div>
+  </section>
+
+  <section class="grid2">
+    <div>
+      <h2>Payout audit trail <span class="api-tag">GET /api/admin/payouts</span> <span class="readonly-badge">Read-only</span></h2>
+      <table>
+        <thead><tr><th>Timestamp</th><th>Claim ID</th><th>Amount</th></tr></thead>
+        <tbody>
+          <tr><td data-label="Timestamp">2026-09-05 14:22:10</td><td data-label="Claim ID">CLM-2026-07690</td><td data-label="Amount">&#8377;35,000.00</td></tr>
+          <tr><td data-label="Timestamp">2026-09-03 09:11:47</td><td data-label="Claim ID">CLM-2026-07602</td><td data-label="Amount">&#8377;17,100.00</td></tr>
+          <tr><td data-label="Timestamp">2026-08-30 16:45:02</td><td data-label="Claim ID">CLM-2026-07530</td><td data-label="Amount">&#8377;22,000.00</td></tr>
+          <tr><td data-label="Timestamp">2026-08-27 11:03:38</td><td data-label="Claim ID">CLM-2026-07488</td><td data-label="Amount">&#8377;150,000.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div>
+      <h2>Override action <span class="api-tag">POST /api/admin/claims/{id}/override</span></h2>
+      <div class="card">
+        <form id="override-form">
+          <div class="field">
+            <label for="override-claim">Claim</label>
+            <select id="override-claim">
+              <option value="CLM-2026-07960">CLM-2026-07960 (PROCESSING_FAILED)</option>
+              <option value="CLM-2026-07850">CLM-2026-07850 (MANUAL_REVIEW)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="override-command">Command</label>
+            <select id="override-command">
+              <option value="FORCE_APPROVE">FORCE_APPROVE</option>
+              <option value="FORCE_REJECT">FORCE_REJECT</option>
+              <option value="RETRY_PIPELINE">RETRY_PIPELINE</option>
+            </select>
+          </div>
+          <div class="field" id="field-reason-code">
+            <label for="override-reason">Reason code</label>
+            <select id="override-reason">
+              <option value="">-- select a reason code --</option>
+              <option value="HIGH_VALUE_REVIEW">HIGH_VALUE_REVIEW</option>
+              <option value="FRAUD_FLAG">FRAUD_FLAG</option>
+              <option value="ZERO_PAYABLE_AMOUNT">ZERO_PAYABLE_AMOUNT</option>
+              <option value="DOCS_INCOMPLETE">DOCS_INCOMPLETE</option>
+              <option value="POLICY_INACTIVE">POLICY_INACTIVE</option>
+            </select>
+            <div class="error-text">Reason code is required before submitting an override.</div>
+          </div>
+          <button type="submit" class="primary">Submit override</button>
+        </form>
+        <div class="confirmation" id="override-confirmation">
+          <strong>200 OK.</strong> AdminOverride recorded for <span id="conf-claim"></span>. See audit history below.
+        </div>
+      </div>
+
+      <h2 style="margin-top:24px;">Override history <span class="api-tag">GET /api/admin/claims/{id}/overrides</span></h2>
+      <table>
+        <thead><tr><th>Timestamp</th><th>Admin</th><th>Command</th><th>Reason code</th></tr></thead>
+        <tbody id="override-history-body">
+          <tr><td data-label="Timestamp">2026-08-22 10:15:00</td><td data-label="Admin">admin-vikram.shah</td><td data-label="Command">RETRY_PIPELINE</td><td data-label="Reason">DOCS_INCOMPLETE</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  var statusSel = document.getElementById('filter-status');
+  var productSel = document.getElementById('filter-product');
+  var rows = document.querySelectorAll('#claims-body tr');
+
+  function applyFilters(){
+    var s = statusSel.value, p = productSel.value;
+    var visible = 0;
+    rows.forEach(function(r){
+      var show = (s === 'ALL' || r.dataset.status === s) && (p === 'ALL' || r.dataset.product === p);
+      r.style.display = show ? '' : 'none';
+      if(show) visible++;
+    });
+    document.getElementById('claims-empty').style.display = visible === 0 ? 'block' : 'none';
+  }
+  statusSel.addEventListener('change', applyFilters);
+  productSel.addEventListener('change', applyFilters);
+
+  document.getElementById('override-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    var reasonField = document.getElementById('field-reason-code');
+    var reasonSelect = document.getElementById('override-reason');
+    if(!reasonSelect.value){
+      reasonField.classList.add('invalid');
+      return; // blocked, no API call
+    }
+    reasonField.classList.remove('invalid');
+
+    var claim = document.getElementById('override-claim').value;
+    var command = document.getElementById('override-command').value;
+    var reason = reasonSelect.value;
+    var now = new Date().toISOString().replace('T',' ').slice(0,19);
+
+    var tbody = document.getElementById('override-history-body');
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td data-label="Timestamp">'+now+'</td><td data-label="Admin">admin-'+(window.__demoAdmin||'anita.iyer')+'</td><td data-label="Command">'+command+'</td><td data-label="Reason">'+reason+'</td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+
+    document.getElementById('conf-claim').textContent = claim;
+    document.getElementById('override-confirmation').classList.add('show');
+    setTimeout(function(){ document.getElementById('override-confirmation').classList.remove('show'); }, 3000);
+  });
+})();
+</script>
+</body>
+</html>
