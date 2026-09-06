@@ -378,8 +378,8 @@
       "Action: Listed.",
       "Assert: Every file matches NNNN_description.sql and NNNN is strictly increasing with no gaps."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -394,8 +394,8 @@
       "Action: The migration runner executes.",
       "Assert: All 9 tables exist: policies, claims, claim_documents, fraud_screenings, assessments, decisions, settlements, claim_state_transitions, admin_overrides."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -410,8 +410,8 @@
       "Action: Run twice against the same database.",
       "Assert: It is idempotent: already-applied migrations are skipped with no error."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -426,8 +426,8 @@
       "Action: Its checksum is recomputed at startup.",
       "Assert: A mismatch, indicating a post-application edit, raises a startup error."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1354,8 +1354,8 @@
       "Action: The dependency resolves.",
       "Assert: The route handler receives an ActorContext with role=ASSESSOR and the given actor_id."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1370,8 +1370,8 @@
       "Action: The dependency resolves.",
       "Assert: The request is rejected with HTTP 401 before the route handler runs."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1386,8 +1386,8 @@
       "Action: The dependency resolves.",
       "Assert: It is rejected with HTTP 401."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1402,8 +1402,8 @@
       "Action: A request arrives with X-Role: ASSESSOR.",
       "Assert: It is rejected with HTTP 403."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T00:00:00+00:00",
     "failure_reason": null,
     "failure_layer": null
   },

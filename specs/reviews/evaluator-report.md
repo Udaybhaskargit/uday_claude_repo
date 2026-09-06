@@ -223,3 +223,148 @@ I considered whether this under-validates in a way that would let a "structurall
 - `backend/tests/architecture/test_config_layer_imports.py` (mutation-tested)
 - `backend/tests/unit/types/test_exceptions.py` (re-run in isolation, confirmed unmodified)
 - `features.json` (F014-F023 updated to `passes: true` following this evaluation)
+
+## Group C — Migrations & Auth Boundary (E3-S1, E8-S1)
+
+**Branch:** `group-c/migrations-and-auth` @ `071de41` (E3-S1 migrations), `20e9bcf` (E8-S1 auth dependency).
+**Verification mode for this group:** N/A — pure repository/API-dependency layer, no running server/Docker required. Verified by direct pytest/ruff/mypy execution against `backend/.venv`, plus hand-written standalone scripts run against the real committed `backend/migrations/` directory (not just the test suite's own fixtures).
+
+### Verdict: **PASS** (both stories)
+
+All three layers of the ratchet gate (independent re-run of every AC, static gates, and an explicit two-generator integration-gap check) pass. No blocking defects found.
+
+---
+
+## Integration-gap check (two generators, disjoint files)
+
+`git show --stat --format="" 071de41` (E3-S1) touches only `backend/migrations/000{1..9}_*.sql`, `backend/src/db/{__init__.py,connection.py,migration_runner.py}`, and `backend/tests/unit/repositories/*`. `git show --stat --format="" 20e9bcf` (E8-S1) touches only `backend/requirements.txt`, `backend/src/api/**`, `backend/src/main.py`, and `backend/tests/integration/api/test_auth_dependency.py`. Zero file overlap between the two commits — confirmed by diffing the two `--stat` outputs directly.
+
+Grepped `src/api/dependencies/auth.py` and `src/main.py` for any reference to `migration`, `connection`, `db_path`, `get_connection`, or `run_migrations` — zero matches. `main.py`'s `create_app()` currently only registers `/health`; it does not call `run_migrations()` or open a DB connection at startup (this is explicitly documented in `main.py`'s own module docstring as deferred to a later group). `AppConfig.db_path` exists (from Group B) but E8-S1's auth dependency never reads it — `get_actor_context`/`require_role` only consult `app_config.valid_roles`. Confirmed: E8-S1's code does not assume any DB/migration state exists, and E3-S1's migration runner/connection module is never invoked from `main.py` or `auth.py`. No integration gap.
+
+---
+
+## What was independently re-run
+
+```
+cd backend && .venv/Scripts/python -m pytest --cov=src --cov-report=term-missing -q
+```
+Result: **137 passed**, coverage **100%** across the full `src/` tree (451/451 statements), including the two new modules `src/db/connection.py` (7/7), `src/db/migration_runner.py` (50/50), and `src/api/dependencies/auth.py` (26/26). Coverage baseline in `.claude/state/coverage-baseline.txt` is `100` — ratchet held.
+
+```
+.venv/Scripts/python -m ruff check .
+```
+Result: **All checks passed!**
+
+```
+.venv/Scripts/python -m mypy src/
+```
+Result: **Success: no issues found in 17 source files.**
+
+---
+
+## Check-by-check findings — E3-S1 (migrations, F024-F027)
+
+### 1. Schema fidelity against data-models.md §2
+
+Diffed the actual CREATE TABLE SQL against data-models.md field-by-field for `policies` (0001), `claims` (0002), `fraud_screenings` (0004), and `settlements` (0007):
+
+- **`policies`**: `sum_insured` is `TEXT NOT NULL` (money-as-TEXT convention honored); unique index on `policy_number`, plain index on `status` — matches §2.1 exactly.
+- **`claims`**: `claim_amount TEXT NOT NULL`; FKs declared on `policy_id -> policies(id)` and `parent_claim_id -> claims(id)` (self-referential); indexes on `policy_id`, `status`, `claim_type`, `parent_claim_id`, and the composite `idx_claims_policy_id_incident_date ON claims (policy_id, incident_date)` required for E4-S3 duplicate detection — present and correctly composite (not two separate single-column indexes). Matches §2.2 exactly.
+- **`fraud_screenings`** (append-only): `score`/`threshold` are `INTEGER NOT NULL`, `flagged INTEGER NOT NULL` (SQLite boolean-as-integer, correct), `breakdown TEXT NOT NULL` (JSON-as-TEXT, correct per §2.4); FK to `claims`; both `idx_fraud_screenings_claim_id` and the composite `(claim_id, created_at)` index for "latest screening" lookup are present. Matches §2.4 exactly.
+- **`settlements`** (append-only, immutable): `payout_amount TEXT NOT NULL`; FKs to both `claims(id)` and `decisions(id)`; indexes on `claim_id` and `created_at` (for the reverse-chronological audit trail). Matches §2.7 exactly.
+- Also spot-checked `claim_documents` (0003): unique composite index `idx_claim_documents_claim_id_document_type ON claim_documents (claim_id, document_type)` present exactly as data-models.md §2.3 requires, plus a non-unique `claim_id` index. Correct.
+- `admin_overrides` (0009): `reason_code TEXT NOT NULL CHECK (length(reason_code) >= 1)` — a genuine DB-level enforcement of the "min length 1, mandatory" constraint from §2.9, on top of whatever the service layer will do in E8-S2. Good defense in depth.
+
+All money fields across all 9 tables are `TEXT`, never `REAL`/`NUMERIC`/`FLOAT`. All FKs from data-models.md's "Relationships" sections are declared. All indexes listed in data-models.md's "Indexes" bullets for the 4 spot-checked tables (plus the 2 extra I checked) are present, correctly composite where specified.
+
+### 2. F024 — strictly sequential numbering, no gaps
+
+`ls backend/migrations/` shows exactly `0001_create_policies.sql` through `0009_create_admin_overrides.sql`, sequential with no gaps. `backend/tests/unit/repositories/test_migrations_directory.py` asserts this against the **real** directory (`Path(__file__).resolve().parents[3] / "migrations"`, not a synthetic tmp fixture) via three separate tests: filename-pattern match, `numbers == list(range(1, len(numbers)+1))`, and exact-name-list equality against `EXPECTED_NAMES`. All three re-run and pass. **PASS.**
+
+### 3. F025 — all 9 tables created on fresh DB
+
+Independently verified: wrote a standalone script (not the repo's own test file) that opens a fresh temp SQLite file, calls `run_migrations(conn, "migrations")` against the real `backend/migrations/` directory, and queries `sqlite_master`. Result: exactly `policies, claims, claim_documents, fraud_screenings, assessments, decisions, settlements, claim_state_transitions, admin_overrides` plus the `schema_migrations` bookkeeping table (and SQLite's own auto-generated `sqlite_sequence`, not a defect — an artifact of `AUTOINCREMENT` columns). No missing table, no extra domain table. **PASS.**
+
+### 4. F026 — idempotent second run
+
+Same script: ran `run_migrations` a second time against the same open connection/DB file. No exception raised; `schema_migrations` row count stayed at 9 (not 18). **PASS.**
+
+### 5. F027 — checksum mismatch after edit raises
+
+Copied the real `migrations/` directory to a throwaway temp directory (the actual committed files in the repo were never touched — confirmed via `git status --porcelain migrations/` returning empty after the whole exercise), appended a byte to the tmp copy's `0001_create_policies.sql`, and re-ran `run_migrations` against the **same already-migrated DB file** but pointed at the tampered tmp directory. Result: raised `ConfigError` with message `"Migration '0001_create_policies.sql' failed checksum verification: it was modified after being applied..."`. **PASS.**
+
+### 6. No `IF NOT EXISTS` gaming idempotency
+
+Read all 9 domain migration `.sql` files directly: none use `CREATE TABLE IF NOT EXISTS` or `CREATE INDEX IF NOT EXISTS` — every domain DDL statement is a bare `CREATE TABLE`/`CREATE INDEX`. Idempotency is achieved purely via the `schema_migrations` bookkeeping table's checksum-tracked skip logic in `migration_runner.py`, not by silently swallowing "table already exists" errors. The one `IF NOT EXISTS` in the whole codebase is on the bookkeeping table itself (`migration_runner.py:23`, `_BOOKKEEPING_TABLE_DDL`), which is expected and does not weaken F027 (the bookkeeping table's own re-creation is idempotent by design; the checksum-mismatch detection operates on the domain migration files, and I directly proved in check 5 above that a tampered domain file still raises `ConfigError` rather than being silently skipped or re-applied). **No gaming found.**
+
+`test_running_twice_is_idempotent` in the repo's own test suite makes this same point explicitly in its comment: "If the runner tried to re-execute 0001's CREATE TABLE (no IF NOT EXISTS in domain migrations), this second call would raise `sqlite3.OperationalError`. It must not." — confirmed true by my own independent re-run.
+
+---
+
+## Check-by-check findings — E8-S1 (auth dependency, F085-F088)
+
+### 1. F085/F086/F087/F088 — re-run and assertion quality
+
+Re-ran `backend/tests/integration/api/test_auth_dependency.py` directly: **8 passed**. Read every assertion:
+
+- Every test uses a `handler_calls: list[str]` fixture that the throwaway route handlers append to on entry. `test_invalid_role_value_is_rejected_before_handler_runs`, `test_missing_role_header_is_rejected`, `test_missing_actor_id_header_is_rejected`, and `test_valid_role_without_required_permission_is_forbidden` all assert `handler_calls == []` **in addition to** the status code — this genuinely proves the route handler body never executed, not just that a 401/403 was returned from somewhere (e.g., not a bug where the handler runs, does work, and then still returns 401). This is exactly the trap the task asked me to check for, and it's covered correctly.
+- `test_valid_role_and_actor_id_resolves_actor_context` (F085) asserts `response.json() == {"role": "ASSESSOR", "actor_id": "assessor-1"}` and `handler_calls == ["whoami"]` — confirms the ActorContext reaches the handler with the correct role/actor_id.
+- 401 tests (F086, F087) assert `response.json()["detail"]["error"]["code"] == "UNAUTHORIZED"` — a real `ApiErrorCode.UNAUTHORIZED.value` from the enum, not a hardcoded string coincidentally matching. Verified `ApiErrorCode.UNAUTHORIZED` exists in `src/types/enums.py` and `auth.py:43` references it via `ApiErrorCode.UNAUTHORIZED.value`.
+- 403 test (F088) asserts `error["code"] == "FORBIDDEN"`, matching `ApiErrorCode.FORBIDDEN.value` referenced in `auth.py:92`.
+- All error bodies match the uniform envelope from `api-contracts.md` (`{"error": {"code", "message", "details"}}`), nested under FastAPI's `HTTPException.detail`, confirmed both by reading `auth.py`'s `_unauthorized()`/403-raise blocks and by the test assertions' exact key paths (`response.json()["detail"]["error"]["code"]`).
+
+**All four ACs independently confirmed genuine, not status-code-only checks.**
+
+### 2. `require_role` composition and role-vs-permission distinction
+
+`require_role(*allowed_roles)` (`auth.py:76-103`) returns an inner `_check_role` coroutine whose only parameter is `actor_context: ActorContext = Depends(get_actor_context)` — it delegates entirely to `get_actor_context` for header parsing rather than re-implementing it, confirmed by reading the source (no `Header(...)` calls inside `require_role`/`_check_role`). `test_admin_role_is_allowed_through_require_role` confirms a role IN the allowed set (`ADMIN` against `require_role(Role.ADMIN)`) reaches the handler (200, `handler_calls == ["admin-only"]`). `test_valid_role_without_required_permission_is_forbidden` confirms a **valid-but-insufficient** role (`ASSESSOR` against `require_role(Role.ADMIN)`) gets exactly **403**, not 401 — matching api-contracts.md's status table ("401: role missing/not in valid_roles; 403: valid role, but not in the route's allowed set") and E8-S1 AC4 precisely. **Correct.**
+
+### 3. `functools.lru_cache` on `get_app_config`
+
+This is the standard FastAPI-documented pattern for settings objects (cited directly in the module docstring with a link to FastAPI's own docs) and is safe for dependency injection since `AppConfig` is an immutable `frozen=True` dataclass — no risk of cross-request mutation of shared cached state. Confirmed the test file overrides it correctly: `app.dependency_overrides[get_app_config] = lambda: AppConfig(...)` (test_auth_dependency.py:54-57) rather than mutating `os.environ` for the route-level tests. The one test that does exercise the real function (`test_get_app_config_wraps_load_app_config`) explicitly calls `get_app_config.cache_clear()` before and after (in a `try/finally`) to avoid cache pollution between tests — correct hygiene, not a hidden test-order dependency.
+
+### 4. `# noqa: B008` usage
+
+Both occurrences (`auth.py:54`, `auth.py:85`) are on `Depends(...)` used as a function-parameter default value — this is FastAPI's own required idiom (`Depends()` must be a mutable default per FastAPI's design, which is exactly what flake8-bugbear's B008 rule normally flags as a footgun). Confirmed no other lint issue is being masked: `ruff check .` (which includes the bugbear ruleset per this project's config, evidenced by B008 being a recognized code the generator needed to suppress) reports "All checks passed!" with these two suppressions in place, and reading the surrounding lines shows nothing else questionable on either line. **Legitimate use, not masking an unrelated issue.**
+
+### 5. `httpx2` dependency — verified as real, not hallucinated
+
+This required direct empirical verification rather than trusting prior training data, per the task's explicit instruction (httpx2 postdates my knowledge cutoff). Ran directly in `backend/.venv`:
+
+- `pip show httpx2` → **Name: httpx2, Version: 2.12.0, Summary: The next generation HTTP client, Home-page: https://github.com/pydantic/httpx2, Author: Tom Christie**. A real, installed, resolvable package (not a hallucinated name) — same author/lineage as the original `httpx`.
+- `pip show starlette` in this environment resolves to **starlette 1.6.0**, and `python -c "from fastapi.testclient import TestClient; print(TestClient.__mro__)"` shows `TestClient` inherits from **`httpx2.Client`** (not the older `httpx.Client`) — confirming this specific environment's `starlette` release has migrated its `TestClient` to build on `httpx2`.
+- Directly ran `pytest tests/integration/api/test_auth_dependency.py -v`: **8 passed**, confirming `TestClient` genuinely works end-to-end against a real FastAPI app with this dependency chain — not just that the package imports cleanly.
+
+**Conclusion: `httpx2>=2.0,<3.0` in `backend/requirements.txt` is a real, correctly-resolved, necessary dependency in this environment (required transitively by the installed `starlette`/`TestClient` version), not a hallucinated or broken package name.**
+
+---
+
+## Gate re-run results
+
+| Gate | Command | Result |
+|---|---|---|
+| pytest + coverage | `pytest --cov=src --cov-report=term-missing -q` | 137 passed, 100% coverage (451/451 stmts) |
+| ruff | `ruff check .` | All checks passed |
+| mypy | `mypy src/` | Success: no issues found in 17 source files |
+
+## Non-blocking observations (nits)
+
+1. `main.py`'s `create_app()` currently mounts nothing but `/health` — expected and explicitly documented in its own docstring as deferred scope for later groups (E9-S1..S4). Not a defect for this group.
+2. The `test_missing_actor_id_header_is_rejected` test in `test_auth_dependency.py` covers a case not explicitly named in E8-S1's four ACs (missing `X-Actor-Id` specifically, as opposed to missing `X-Role`) — this is a reasonable, disclosed extension consistent with api-contracts.md's requirement that both headers are mandatory on every authenticated route, not scope creep.
+
+## Files reviewed
+
+- `specs/stories/E3-S1.md`, `E8-S1.md`
+- `specs/design/data-models.md` (§2.1-§2.9 entity tables, §3.1 ActorContext)
+- `specs/design/api-contracts.md` (auth headers, error envelope, 401/403 status table)
+- `specs/design/folder-structure.md`
+- `backend/migrations/0001_*.sql` .. `0009_*.sql` (all 9 read and diffed against data-models.md)
+- `backend/src/db/connection.py`, `migration_runner.py`
+- `backend/tests/unit/repositories/test_connection.py`, `test_migration_runner.py`, `test_migrations_directory.py`
+- `backend/src/api/dependencies/auth.py`
+- `backend/src/main.py`
+- `backend/src/config/app_config.py` (cross-checked for DB/auth coupling)
+- `backend/tests/integration/api/test_auth_dependency.py`
+- `backend/requirements.txt` (`httpx2` dependency independently verified installed/importable/functional in `backend/.venv`)
+- `git show --stat` for `071de41` and `20e9bcf` (confirmed zero file overlap between the two generator commits)
+- `features.json` (F024-F027, F085-F088 updated to `passes: true` following this evaluation)
