@@ -113,3 +113,40 @@
   deferred since `pyproject.toml` is a shared file and this is cosmetic, not blocking.
 - Landed via branch `group-c/migrations-and-auth` + PR (capstone PR-only-merge rule), not a direct
   commit to main.
+
+## Group D — Persistence Layer complete (Repository layer, MILESTONE)
+- **Date:** 2026-09-07T00:00:00Z
+- **Status:** PASS
+- **Stories:** [E3-S2, E3-S3, E3-S4]
+- **Mode:** full
+- **Summary:** Three generator agents ran fully in parallel on disjoint files: policy repository,
+  claim + claim_document repositories (apply_transition delegates to the E1-S2 state machine gate,
+  atomic UPDATE+INSERT via `with connection:`), and the five append-only audit repositories
+  (fraud_screening, assessment, decision, settlement, admin_override — no update()/delete() on any).
+  This completes the Repository layer (backend/src/db/ + backend/src/repositories/, 7 modules).
+  Evaluator independently re-queried the live SQLite DB after every repository call (not trusting
+  return values alone), traced the transaction-atomicity claim in claim_repository.py:102-119,
+  independently repeated the insert-only mutation test on a different class (DecisionRepository)
+  than the generator used, and confirmed no cross-layer imports. No blocking defects.
+- **Checks:** 0 API, 0 Playwright, 0 design — architecture checks passed (repositories import only
+  Types/Config; insert-only structural gate mutation-tested twice, by two different agents, on two
+  different classes), all 12 features (F028-F039) verified.
+- **Coverage:** 100% (baseline: 100%) — full src/ tree, 618/618 statements
+- **Learned Rules Applied:** none (none exist yet)
+
+### Micro-DAG
+- Phase 1 (Independent, disjoint files): [E3-S2 generator (policy_repository.py), E3-S3 generator
+  (claim_repository.py, claim_document_repository.py), E3-S4 generator (5 audit repository files)]
+  — all three ran concurrently, no integrator phase needed (zero shared files across the three).
+
+### Notes
+- Commits: `d06d378` (E3-S2), `199edf6` (E3-S4), `f58dd2c` (E3-S3)
+- Evaluator report: `specs/reviews/evaluator-report.md` (Group D section) — also serves as the
+  Repository-layer-complete milestone summary per coordinator's checkpoint cadence.
+- Non-blocking follow-up flagged by evaluator for a future group: `exists_duplicate()` in
+  `claim_repository.py` treats ANY existing claim for `(policy_id, incident_date)` as a duplicate
+  regardless of status (no exclusion list specified by the AC). Whoever implements E4-S3 (duplicate
+  detection, Group F) and E7-S2 (reopen, Group E) should confirm `reopen()`'s claim-creation path
+  doesn't incorrectly trip this check on a legitimate resubmission.
+- Landed via branch `group-d/repositories` + PR (capstone PR-only-merge rule), not a direct commit
+  to main.
