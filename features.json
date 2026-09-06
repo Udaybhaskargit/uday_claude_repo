@@ -10,8 +10,8 @@
       "Action: Inspected.",
       "Assert: It exposes id, policy_id, claim_type (one of MOTOR|HEALTH|LIFE), incident_date, claim_amount (Decimal), status, and a nullable parent_claim_id."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -26,8 +26,8 @@
       "Action: Enumerated.",
       "Assert: It contains exactly INTAKE, DOCS_PENDING, FRAUD_SCREENING, ASSESSMENT, AUTO_APPROVED, MANUAL_REVIEW, REJECTED, SETTLED, REOPENED, PROCESSING_FAILED."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -42,8 +42,8 @@
       "Action: Enumerated.",
       "Assert: It contains exactly CUSTOMER, ASSESSOR, ADMIN."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -58,8 +58,8 @@
       "Action: Inspected.",
       "Assert: It exposes policy_number, product_type, status (ACTIVE|LAPSED|...), sum_insured (Decimal), effective_date, expiry_date."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -74,8 +74,8 @@
       "Action: Its declared type is inspected.",
       "Assert: It is a fixed-point Decimal type, never a floating-point float (NFR-01)."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -90,8 +90,8 @@
       "Action: Transition() is called.",
       "Assert: The claim status becomes FRAUD_SCREENING."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -106,8 +106,8 @@
       "Action: Transition() is called.",
       "Assert: It raises InvalidClaimStateException and the claim status is unchanged."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -122,8 +122,8 @@
       "Action: Every ClaimStatus value is checked.",
       "Assert: Each appears as a key with an explicit set of valid outgoing events and no implicit fallthrough."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -138,8 +138,8 @@
       "Action: It completes.",
       "Assert: A ClaimStateTransition record (from_state, to_state, event, timestamp) is returned for the caller to persist."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -154,8 +154,8 @@
       "Action: Enumerated.",
       "Assert: It contains exactly POLICY_INACTIVE, ZERO_PAYABLE_AMOUNT, FRAUD_FLAG, AUTO_APPROVED_LOW_RISK, HIGH_VALUE_REVIEW, DOCS_INCOMPLETE."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -170,8 +170,8 @@
       "Action: Raised.",
       "Assert: It carries the policy_number and incident_date that failed validation."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -186,8 +186,8 @@
       "Action: Raised.",
       "Assert: It carries the policy_number and incident_date of the conflicting claim."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -202,8 +202,8 @@
       "Action: Caught by the API layer.",
       "Assert: Its type maps to exactly one HTTP status code (409 for duplicate, 422 for policy-inactive, 409 for invalid transition)."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:11:32.565766+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
