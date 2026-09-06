@@ -105,3 +105,26 @@ notes: Group B (backend/src/config/ — fraud rule loader, assessment rule loade
   layer, after API layer, and before the frontend GAN loop — not after every group.
 next_action: Run /auto --mode full to begin Group C (E3-S1 migrations + E8-S1 auth dependency —
   first Repository-layer stories, depends on E2-S3/E1-S1)
+
+=== Session 5 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C]
+groups_remaining: [D, E, F, G, H, I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: none (E3-S1 + E8-S1 verified directly, no separate sprint-contracts/C.json written —
+  note for next session: consider adding one retroactively for consistency, non-blocking)
+last_commit: 20e9bcf "feat(api): E8-S1 -- role-based auth boundary dependency (F085-F088)"
+features_passing: 31 / 130
+coverage: 100%
+learned_rules: 0
+blocked_stories: none
+notes: Group C ran two generator agents in parallel on disjoint files (migrations+db vs. api+main),
+  no shared-file conflicts, no integrator phase needed. Landed via branch
+  group-c/migrations-and-auth + PR per capstone PR-only-merge rule. Repository layer is NOT yet
+  fully done (Group D still has the policy/claim/audit repositories) -- per coordinator's milestone
+  cadence, next check-in is after Group D (Repository layer complete), then after the Service layer,
+  then API layer, then before the frontend GAN loop.
+next_action: Run /auto --mode full to begin Group D (E3-S2 policy repo, E3-S3 claim repo, E3-S4
+  audit repos -- completes the Repository layer)

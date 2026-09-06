@@ -75,3 +75,41 @@
   thresholds structurally, since no AC requires it — left as-is.
 - Landed via branch `group-b/config-layer` + PR (capstone PR-only-merge rule), not a direct commit
   to main.
+
+## Group C — Persistence Bootstrap + Auth Boundary (Repository + API, first slice)
+- **Date:** 2026-09-07T00:00:00Z
+- **Status:** PASS
+- **Stories:** [E3-S1, E8-S1]
+- **Mode:** full
+- **Summary:** Two independent generator agents ran in parallel on disjoint files (no shared-file
+  conflict): one built backend/migrations/ (9 numbered SQL files) + backend/src/db/ (connection
+  factory, checksum-verified idempotent migration runner); the other built
+  backend/src/api/dependencies/auth.py (X-Role/X-Actor-Id -> ActorContext, require_role(*roles))
+  plus a minimal backend/src/main.py app factory. Evaluator independently ran the real migration
+  runner against a fresh temp SQLite DB (not just the test suite) to directly confirm all 9 tables,
+  idempotency, and checksum-mismatch detection, and confirmed the auth dependency's 401/403 tests
+  assert the protected handler body never executes (not just status code). No blocking defects.
+- **Checks:** 0 API-contract checks yet (no business routers exist), 0 Playwright, 0 design —
+  architecture checks passed (Repository imports only Types/Config; API auth dependency composes
+  correctly), all 8 features (F024-F027, F085-F088) verified.
+- **Coverage:** 100% (baseline: 100%) — full src/ tree, 451/451 statements
+- **Learned Rules Applied:** none (none exist yet)
+
+### Micro-DAG
+- Phase 1 (Independent, no cross-story file conflicts): [E3-S1 generator, E8-S1 generator] — ran
+  concurrently on the same branch, disjoint file ownership (backend/migrations/+src/db/ vs.
+  backend/src/api/+src/main.py), no integrators needed.
+
+### Notes
+- Commits: `071de41` (E3-S1 migrations), `20e9bcf` (E8-S1 auth dependency)
+- Evaluator report: `specs/reviews/evaluator-report.md` (Group C section)
+- Environment note: `backend/requirements.txt` now pins `httpx2>=2.0,<3.0` (a newer major-version
+  successor to `httpx` that this environment's `starlette` 1.6.0 `TestClient` requires) — confirmed
+  real and correctly resolved by both the generator and an independent evaluator check
+  (`pip show httpx2`), not a hallucinated package.
+- Non-blocking flag from generator: `pyproject.toml`'s ruff config could add
+  `extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]` under
+  `[tool.ruff.lint.flake8-bugbear]` to avoid per-line `# noqa: B008` on future FastAPI routers —
+  deferred since `pyproject.toml` is a shared file and this is cosmetic, not blocking.
+- Landed via branch `group-c/migrations-and-auth` + PR (capstone PR-only-merge rule), not a direct
+  commit to main.
