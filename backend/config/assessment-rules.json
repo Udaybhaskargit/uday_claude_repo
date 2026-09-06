@@ -1,0 +1,17 @@
+{
+  "claim_types": {
+    "motor": {
+      "deductible": 5000,
+      "co_pay_pct": 0
+    },
+    "health": {
+      "deductible": 1000,
+      "co_pay_pct": 10
+    },
+    "life": {
+      "deductible": 0,
+      "co_pay_pct": 0
+    }
+  },
+  "auto_approve_ceiling": 50000
+}
