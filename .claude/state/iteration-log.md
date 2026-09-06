@@ -48,3 +48,30 @@
   models.py and E1-S1/S3 share enums.py, but the generator wrote both in one pass as a 3-story unit).
 - Landed via branch `group-a/domain-types` + PR (capstone PR-only-merge rule), not a direct commit
   to main.
+
+## Group B — Business Rule Configuration (Config layer)
+- **Date:** 2026-09-06T00:00:00Z
+- **Status:** PASS
+- **Stories:** [E2-S1, E2-S2, E2-S3]
+- **Mode:** full
+- **Summary:** Implemented backend/src/config/ (fraud rule config loader, assessment rule config
+  loader, AppConfig) plus the two declarative JSON config files. Generator extended Group A's bare
+  `ConfigError` with an optional `variable_name` kwarg (additive, non-breaking). Evaluator
+  independently re-ran all gates, verified the shipped JSON config files directly (not just
+  in-memory test fixtures), mutation-tested the new import-layering test by injecting a temporary
+  forbidden import, and confirmed the on-disk-edit-is-picked-up-on-reload behavior (E2-S1 AC4) with
+  no module-level caching. No blocking defects.
+- **Checks:** 0 API, 0 Playwright, 0 design (no API/UI surface yet) — architecture checks passed
+  (Config imports only Types; one-way import rule mutation-tested), all 10 features (F014-F023)
+  verified against acceptance criteria.
+- **Coverage:** 100% (baseline: 100%) — full src/ tree (types + config), 359/359 statements
+- **Learned Rules Applied:** none (none exist yet)
+
+### Notes
+- Generator commit: `51ff8b9` "implement Group B config layer" (backend/config/fraud-rules.json,
+  assessment-rules.json; backend/src/config/{app_config,fraud_rules_config,assessment_rules_config}.py)
+- Evaluator report: `specs/reviews/evaluator-report.md` (Group B section)
+- Non-blocking observation from evaluator: neither config loader rejects negative/zero weights or
+  thresholds structurally, since no AC requires it — left as-is.
+- Landed via branch `group-b/config-layer` + PR (capstone PR-only-merge rule), not a direct commit
+  to main.

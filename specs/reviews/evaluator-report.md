@@ -122,3 +122,104 @@ Confirmed empty via my own independent grep against the actual import statements
 - `backend/tests/architecture/test_layer_imports.py`, `test_state_mutation_gate.py`
 - `backend/pyproject.toml`
 - `features.json` (F001–F013 updated to `passes: true` following this evaluation)
+
+## Group B — Config Layer (E2-S1, E2-S2, E2-S3)
+
+**Branch:** `group-b/config-layer` @ `51ff8b9` ("feat(config): implement Group B config layer (E2-S1, E2-S2, E2-S3)")
+**Verification mode for this group:** N/A — pure Python config layer built on Types, no API/DB/Docker/UI surface. Verified by direct pytest/ruff/mypy execution against `backend/.venv`.
+
+### Verdict: **PASS**
+
+All three layers of the ratchet gate that apply to this group (unit tests against every AC, static gates, architecture/structural gates) were independently re-executed and pass. No blocking defects found.
+
+---
+
+## What was independently re-run
+
+```
+cd backend && .venv/Scripts/python -m pytest --cov=src --cov-report=term-missing -q
+```
+Result: **115 passed**, coverage **100%** across the full `src/` tree (359/359 statements), including the three new modules `src/config/app_config.py` (34/34), `src/config/assessment_rules_config.py` (59/59), `src/config/fraud_rules_config.py` (56/56). Coverage baseline in `.claude/state/coverage-baseline.txt` is `100` — ratchet held.
+
+```
+.venv/Scripts/python -m ruff check .
+```
+Result: **All checks passed!**
+
+```
+.venv/Scripts/python -m mypy src/
+```
+Result: **Success: no issues found in 10 source files.**
+
+Independent checks (not trusting the generator's report or docstrings):
+
+- Read the shipped `backend/config/fraud-rules.json` directly: exactly 5 rules — `HIGH_CLAIM_TO_SUM_RATIO`:40, `EARLY_FILING`:25, `CLAIM_FREQUENCY`:30, `MOTOR_MISSING_FIR`:15, `ROUND_NUMBER_CLAIM`:10 — and `"threshold": 60`. Matches BRD section 11 and data-models.md section 3.2's canonical rule-name closed set exactly.
+- Read the shipped `backend/config/assessment-rules.json` directly: `motor` (deductible 5000, co_pay_pct 0), `health` (deductible 1000, co_pay_pct 10), `life` (deductible 0, co_pay_pct 0), `auto_approve_ceiling: 50000`. Matches E2-S2 AC1/AC2 exactly.
+- Confirmed `test_repo_fraud_rules_config_has_exactly_5_rules_matching_brd_weights`, `test_repo_fraud_rules_config_threshold_is_60`, `test_repo_assessment_rules_config_has_exact_per_claim_type_values`, and `test_repo_assessment_rules_config_auto_approve_ceiling_is_50000` load the actual repo file (`Path(__file__).resolve().parents[3] / "config" / ...`), not an in-memory/tmp fixture — a regression to the shipped file would fail these tests, not just an isolated unit fixture.
+- Grepped `backend/src/config/*.py` myself for imports (not trusting `test_config_layer_imports.py`'s existence alone): only `__future__`, `json`, `dataclasses`, `pathlib`, `os`, `collections.abc`, and `src.types.*`. No `src.repositories`, `src.services`, `src.api`, or `src.db` imports anywhere.
+- Mutation-tested `test_config_layer_imports.py` itself: temporarily added `backend/src/config/_mutation_test_temp.py` containing `from src.repositories.fake import Something`, re-ran the architecture test suite — it correctly failed with `AssertionError: _mutation_test_temp.py imports non-Types, non-stdlib module 'src.repositories.fake'`. Removed the temp file, re-ran — 3 passed, working tree confirmed clean (`git status --short` empty). The test is genuine, not vacuous.
+- Grepped for caching patterns (`lru_cache`, `_cache`, `@cache`, module-level singletons) in `backend/src/config/` — no matches. Both `load_fraud_rules_config` and `load_assessment_rules_config` are plain functions with no module-level state; each call does `Path(path).read_text()` fresh.
+- Diffed `backend/src/types/exceptions.py` between the Group A merge commit (`c184ca0`) and this commit (`51ff8b9`): the only change is `ConfigError` gaining an explicit `__init__(self, message: str, *, variable_name: str | None = None)` (previously it had no custom `__init__` and inherited `Exception.__init__`). This is strictly additive — a new keyword-only optional parameter with a default — so every existing call site (`ConfigError("some message")`) is unaffected. Confirmed `backend/tests/unit/types/test_exceptions.py` is not in the changed-file list for this commit (`git diff --name-only c184ca0..51ff8b9`) and re-ran it in isolation: 10/10 passed unmodified.
+- Confirmed `backend/src/config/__init__.py` exists (empty, as expected for a plain package marker) and all six files listed in `sprint-contracts/B.json`'s `files_must_exist` are present.
+- Cross-checked `specs/design/folder-structure.md`'s `backend/src/config/` block against the actual directory — exact match (`app_config.py`, `fraud_rules_config.py`, `assessment_rules_config.py`, `__init__.py`).
+
+---
+
+## Check-by-check findings (F014-F023)
+
+- **F014** (5 rules, exact BRD weights) — PASS. Verified against the shipped file directly (see above), not just a test fixture.
+- **F015** (threshold == 60) — PASS. Verified against the shipped file directly.
+- **F016** (missing/malformed file raises typed `ConfigError` at load) — PASS. `test_load_fraud_rules_config_missing_file_raises_config_error`, `..._malformed_json_raises_config_error`, plus 8 more structural-failure tests (wrong count, unknown name, duplicate name, missing/non-int threshold, non-int weight, non-object top-level/entry) in `test_fraud_rules_config.py`, and the analogous set in `test_assessment_rules_config.py`. All raise `ConfigError`, none fall back to defaults — confirmed by reading `fraud_rules_config.py`/`assessment_rules_config.py`: every failure path is an explicit `raise ConfigError(...)`, there is no `except: pass` or default-substitution branch anywhere in either loader.
+- **F017** (AC4 - on-disk edit with no code change is picked up on next load) — PASS, and this is the trickiest one so it got the most scrutiny. `test_load_fraud_rules_config_reflects_on_disk_edit_on_next_load` (and the assessment-rules analog) writes a config to a `tmp_path`, calls `load_fraud_rules_config(str(path))` once (`first_load`, threshold 60), overwrites the same file path in place with `threshold: 75`, calls `load_fraud_rules_config(str(path))` again (`second_load`), and asserts `second_load.threshold == 75` and `first_load.threshold == 60` (proving the first returned object is an independent, non-mutated snapshot, and the loader is not caching/memoizing by path). This is a legitimate, non-trivial reload test, not testing against a cached singleton.
+- **F018** (assessment shipped values) — PASS. Verified against the shipped file directly.
+- **F019** (auto_approve_ceiling == 50000) — PASS. Verified against the shipped file directly.
+- **F020** (unknown claim_type raises `UnknownClaimTypeError`) — PASS, with a specific reachability check per the task's instruction. Two tests cover this: (1) `test_for_claim_type_raises_unknown_claim_type_error_for_unrecognized_key` calls `config.for_claim_type("BOAT")` against a real, fully-loaded config — this is genuinely reachable in production, since `for_claim_type()` is a public method any caller (including a future API layer parsing an untrusted `claim_type` string) could call with an out-of-domain value, and `AssessmentRulesConfig.for_claim_type` defensively re-coerces via `ClaimType(claim_type)` specifically to catch this. (2) `test_for_claim_type_raises_unknown_claim_type_error_when_map_incomplete` directly constructs an `AssessmentRulesConfig` with an incomplete `rules_by_claim_type` map and calls `for_claim_type(ClaimType.LIFE)` — this test's own docstring correctly discloses that this exact scenario is unreachable via `load_assessment_rules_config` (which always populates all 3 types) and exists purely to cover the defensive `except KeyError` branch. This is legitimate defensive-code coverage disclosed honestly, not a disguised no-op test — the class is a public dataclass, not sealed against manual construction, so a future caller building one another way (or a refactor) could hit this path.
+- **F021** (db_path/backend_port 8000/frontend_port 5173) — PASS. `test_load_app_config_exposes_db_path_and_default_ports` asserts all three; `DEFAULT_BACKEND_PORT = 8000` / `DEFAULT_FRONTEND_PORT = 5173` constants in `app_config.py:23-24` match the AC literally.
+- **F022** (valid_roles == exactly [CUSTOMER, ASSESSOR, ADMIN], from Types) — PASS, checked for the "hardcoded strings that happen to match" trap specifically. `app_config.py` imports `Role` from `src.types.enums` and builds `VALID_ROLES: tuple[Role, ...] = (Role.CUSTOMER, Role.ASSESSOR, Role.ADMIN)` — genuine enum members, not string literals. Confirmed `Role` in `backend/src/types/enums.py:11-16` is `CUSTOMER`/`ASSESSOR`/`ADMIN` exactly. Test asserts `list(config.valid_roles) == [Role.CUSTOMER, Role.ASSESSOR, Role.ADMIN]` — importing and comparing against the same enum, not a re-typed string list.
+- **F023** (missing required env var raises typed error naming the variable) — PASS, checked for the "generic message" trap specifically. `load_app_config` raises `ConfigError(f"Missing required environment variable: {DB_PATH_ENV_VAR}", variable_name=DB_PATH_ENV_VAR)`. `test_load_app_config_missing_db_path_raises_config_error_naming_variable` asserts both `exc_info.value.variable_name == _DB_PATH_ENV_VAR` (a real attribute, not just message text) and `_DB_PATH_ENV_VAR in str(exc_info.value)` (the human-readable message too). Genuinely names the variable via a structured attribute, not just an incidental substring.
+
+## `ConfigError` extension does not break Group A
+
+Confirmed additive-only (see diff summary above): new keyword-only `variable_name` parameter with a `None` default. `backend/tests/unit/types/test_exceptions.py` was not touched by this commit and passes unmodified (10/10) with the extended class. Full suite (115 tests, spanning both Types and Config) passes together with no interaction failures.
+
+## One-way import rule
+
+Confirmed via independent grep and a live mutation test of the architecture test itself (see above) — `backend/src/config/*.py` imports only stdlib and `src.types.*`. `test_config_layer_imports.py`'s AST-scan logic is sound: it correctly failed when a forbidden import was injected and correctly passed once removed, so it is not vacuously green.
+
+## No config caching
+
+Confirmed via grep (no `lru_cache`/`_cache`/singleton patterns) and via direct reading of both loader modules — every call to `load_fraud_rules_config`/`load_assessment_rules_config` does a fresh `Path.read_text()` plus re-validation, with no module-level state. This is consistent with the F017/AC4 reload tests actually passing for the right reason (fresh read) rather than coincidentally passing due to some other caching quirk.
+
+## Assessment of the "no hard-coded threshold/weight validation" design decision
+
+The generator's stated reasoning is sound and I agree with it. The loader validates:
+1. Exactly 5 rule entries (count).
+2. Each rule name is drawn from the canonical closed set in data-models.md section 3.2 (domain-set membership).
+3. No duplicate names (implies, combined with 1+2, that all 5 canonical names are present exactly once - confirmed by reading the loader's own comment at `fraud_rules_config.py:124-128`, which correctly derives this logical guarantee rather than asserting it redundantly).
+4. Weight and threshold are integers (type structural validation).
+
+It deliberately does not validate that `threshold == 60` or that any specific rule's `weight` equals its BRD value. This is the correct line to draw: E2-S1 AC4 explicitly requires that the threshold (and, by the same logic, the rule weights) be editable via the file with no code change - hardcoding "threshold must equal 60" into the loader would make the value immutable in practice (any edit would throw at load time), directly contradicting AC4. The BRD-exact values are correctly enforced instead as content assertions against the shipped file (`test_repo_fraud_rules_config_has_exactly_5_rules_matching_brd_weights`, `test_repo_fraud_rules_config_threshold_is_60`) - this is the right layer for "the value the ops team ships today happens to be 60," while the loader itself only enforces the shape/domain a valid file must have.
+
+I considered whether this under-validates in a way that would let a "structurally valid but nonsensical" file slip through in production - e.g. `threshold: -5` or `weight: 0` for every rule. The current loader would accept both. This is arguably a legitimate gap (negative or zero weights/threshold are nonsensical for a scoring system, and rejecting them would not conflict with AC4's intent of allowing any different *valid* value to be editable). However: (a) no story or AC in E2-S1/E2-S2 asks for a value-range check, (b) `data-models.md` does not specify a valid range either, and (c) adding an opinionated range check not requested by any AC would be scope creep in the other direction. I flag this as a non-blocking observation for a future story (e.g., "weights and threshold must be non-negative integers") rather than a defect in this group.
+
+---
+
+## Non-blocking observations (nits)
+
+1. Neither loader rejects negative or zero weights/threshold/deductible/co_pay_pct/auto_approve_ceiling (see design-decision assessment above). Not required by any current AC; worth a future story if ops-side fat-fingering a negative value in the JSON should be caught at load time rather than surfacing as a downstream scoring anomaly.
+2. `ClaimTypeRules`/`FraudRule`/`AppConfig` are all `@dataclass(frozen=True)`, which is good practice for config value objects (prevents accidental in-place mutation of a loaded snapshot) - noted as a positive, not a defect.
+
+## Files reviewed
+
+- `sprint-contracts/B.json`
+- `specs/stories/E2-S1.md`, `E2-S2.md`, `E2-S3.md`
+- `specs/design/data-models.md` (section 3.2)
+- `specs/design/folder-structure.md`
+- `.claude/architecture.md`
+- `backend/config/fraud-rules.json`, `assessment-rules.json`
+- `backend/src/config/app_config.py`, `fraud_rules_config.py`, `assessment_rules_config.py`, `__init__.py`
+- `backend/src/types/exceptions.py` (diffed against `c184ca0`)
+- `backend/tests/unit/config/test_fraud_rules_config.py`, `test_assessment_rules_config.py`, `test_app_config.py`
+- `backend/tests/architecture/test_config_layer_imports.py` (mutation-tested)
+- `backend/tests/unit/types/test_exceptions.py` (re-run in isolation, confirmed unmodified)
+- `features.json` (F014-F023 updated to `passes: true` following this evaluation)
