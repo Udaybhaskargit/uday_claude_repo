@@ -1,0 +1,30 @@
+{
+  "rules": [
+    {
+      "name": "HIGH_CLAIM_TO_SUM_RATIO",
+      "weight": 40,
+      "description": "Claim amount exceeds 80% of the policy sum insured."
+    },
+    {
+      "name": "EARLY_FILING",
+      "weight": 25,
+      "description": "Claim filed within 3 days of policy inception."
+    },
+    {
+      "name": "CLAIM_FREQUENCY",
+      "weight": 30,
+      "description": "More than 2 claims filed by the same policy in the last 90 days."
+    },
+    {
+      "name": "MOTOR_MISSING_FIR",
+      "weight": 15,
+      "description": "Motor claim is missing the required police FIR document."
+    },
+    {
+      "name": "ROUND_NUMBER_CLAIM",
+      "weight": 10,
+      "description": "Claim amount is a round number evenly divisible by 10000."
+    }
+  ],
+  "threshold": 60
+}

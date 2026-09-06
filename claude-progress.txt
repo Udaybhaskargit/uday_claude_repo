@@ -83,3 +83,25 @@ notes: Group A (backend/src/types/ — enums, models, exceptions, state machine)
   per capstone PR-only-merge rule. Coverage baseline ratcheted 0% -> 100%.
 next_action: Run /auto --mode full to begin Group B (E2-S1, E2-S2, E2-S3 — config layer,
   depends only on E1-S1)
+
+=== Session 4 ===
+date: 2026-09-06T00:00:00Z
+mode: full
+groups_completed: [A, B]
+groups_remaining: [C, D, E, F, G, H, I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: sprint-contracts/B.json
+last_commit: 51ff8b9 "implement Group B config layer"
+features_passing: 23 / 130
+coverage: 100%
+learned_rules: 0
+blocked_stories: none
+notes: Group B (backend/src/config/ — fraud rule loader, assessment rule loader, AppConfig)
+  implemented and independently verified (evaluator mutation-tested the new import-layering test
+  and confirmed no config caching, satisfying E2-S1 AC4's on-disk-edit-reload requirement). Landed
+  via branch group-b/config-layer + PR per capstone PR-only-merge rule. Coverage holds at 100%.
+  Coordinator set checkpoint cadence: report after Repository layer (~Group D), after Service
+  layer, after API layer, and before the frontend GAN loop — not after every group.
+next_action: Run /auto --mode full to begin Group C (E3-S1 migrations + E8-S1 auth dependency —
+  first Repository-layer stories, depends on E2-S3/E1-S1)

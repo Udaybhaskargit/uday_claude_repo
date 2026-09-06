@@ -65,7 +65,18 @@ class UnknownClaimTypeError(DomainException):
 
 class ConfigError(DomainException):
     """Raised when declarative config (fraud-rules.json, etc.) is missing or
-    malformed at startup, rather than silently falling back to defaults."""
+    malformed at startup, rather than silently falling back to defaults.
+
+    `variable_name` is optional context naming the specific config key or
+    environment variable that caused the failure (e.g. E2-S3 AC3: a missing
+    required environment variable must be named in the raised error), so
+    callers that don't have a single named variable (e.g. a malformed JSON
+    file) can omit it.
+    """
+
+    def __init__(self, message: str, *, variable_name: str | None = None) -> None:
+        self.variable_name = variable_name
+        super().__init__(message)
 
 
 class ValidationError(DomainException):

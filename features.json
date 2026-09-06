@@ -218,8 +218,8 @@
       "Action: Loaded at startup.",
       "Assert: It contains exactly 5 rules matching BRD section 11 weights: ratio>0.8 (+40), filed within 3 days (+25), more than 2 claims in 90 days (+30), motor missing FIR (+15), round number divisible by 10000 (+10)."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -234,8 +234,8 @@
       "Action: The flag threshold is read.",
       "Assert: Its value is 60."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -250,8 +250,8 @@
       "Action: The file is missing or malformed.",
       "Assert: It raises a typed config error at startup rather than the app starting with silent defaults."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -266,8 +266,8 @@
       "Action: Changed in the config file only with no code change.",
       "Assert: The fraud service picks up the new value on next load."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -282,8 +282,8 @@
       "Action: Loaded.",
       "Assert: Motor has deductible 5000 and co_pay_pct 0, health has deductible 1000 and co_pay_pct 10, life has deductible 0 and co_pay_pct 0."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -298,8 +298,8 @@
       "Action: Loaded.",
       "Assert: Auto_approve_ceiling equals 50000."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -314,8 +314,8 @@
       "Action: A claim_type outside {motor, health, life} is requested.",
       "Assert: The loader raises a typed UnknownClaimTypeError."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -330,8 +330,8 @@
       "Action: Loaded.",
       "Assert: It exposes db_path, backend_port (8000), and frontend_port (5173)."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -346,8 +346,8 @@
       "Action: Enumerated.",
       "Assert: It equals exactly CUSTOMER, ASSESSOR, ADMIN, matching the Role enum in Types."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -362,8 +362,8 @@
       "Action: AppConfig loads.",
       "Assert: It raises a typed config error naming the missing variable."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-06T18:29:02.425514+00:00",
     "failure_reason": null,
     "failure_layer": null
   },

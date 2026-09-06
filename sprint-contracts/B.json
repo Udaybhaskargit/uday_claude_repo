@@ -1,0 +1,29 @@
+{
+  "group": "B",
+  "stories": ["E2-S1", "E2-S2", "E2-S3"],
+  "features": [
+    "F014", "F015", "F016", "F017",
+    "F018", "F019", "F020",
+    "F021", "F022", "F023"
+  ],
+  "contract": {
+    "api_checks": [],
+    "playwright_checks": [],
+    "design_checks": {},
+    "architecture_checks": {
+      "layering": {
+        "required": true,
+        "description": "backend/src/config/ imports only from backend/src/types/ (stdlib aside) -- never from backend/src/db/, backend/src/repositories/, backend/src/services/, backend/src/api/, or any UI/frontend code -- Config is Layer 2, per .claude/architecture.md. Verified by backend/tests/architecture/test_config_layer_imports.py.",
+        "no_module_level_cache": "backend/src/config/fraud_rules_config.py and backend/src/config/assessment_rules_config.py re-read and re-validate their JSON file from disk on every call to their load_*_config() function -- no module-level singleton -- so an on-disk edit is reflected on the very next load with no code change (E2-S1 AC4). Verified by test_load_fraud_rules_config_reflects_on_disk_edit_on_next_load and test_load_assessment_rules_config_reflects_on_disk_edit_on_next_load in backend/tests/unit/config/."
+      },
+      "files_must_exist": [
+        "backend/config/fraud-rules.json",
+        "backend/config/assessment-rules.json",
+        "backend/src/config/__init__.py",
+        "backend/src/config/app_config.py",
+        "backend/src/config/fraud_rules_config.py",
+        "backend/src/config/assessment_rules_config.py"
+      ]
+    }
+  }
+}
