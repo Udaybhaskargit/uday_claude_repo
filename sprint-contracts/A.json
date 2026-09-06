@@ -1,0 +1,38 @@
+{
+  "group": "A",
+  "stories": ["E1-S1", "E1-S2", "E1-S3"],
+  "features": [
+    "F001", "F002", "F003", "F004", "F005",
+    "F006", "F007", "F008", "F009",
+    "F010", "F011", "F012", "F013"
+  ],
+  "contract": {
+    "api_checks": [],
+    "playwright_checks": [],
+    "design_checks": {},
+    "architecture_checks": {
+      "layering": {
+        "required": true,
+        "description": "backend/src/types/ imports nothing from backend/src/config/, backend/src/repositories/, backend/src/services/, backend/src/api/, or any UI/frontend code -- Types is Layer 1, the lowest layer, per .claude/architecture.md. Verified by backend/tests/architecture/test_layer_imports.py."
+      },
+      "typing": {
+        "required": true,
+        "description": "Every monetary field on Claim, Assessment, and Settlement (claim_amount, sum_insured, deductible, co_pay, payable_amount, payout_amount) is declared as decimal.Decimal, never float (NFR-01, E1-S1 AC5). Full type hints on every public function/dataclass field in backend/src/types/*.py. Verified by backend/tests/unit/types/test_models.py and mypy."
+      },
+      "folder_structure": {
+        "required": true,
+        "description": "backend/src/types/ contains exactly enums.py, models.py, exceptions.py, state_machine.py, and __init__.py, matching specs/design/folder-structure.md."
+      },
+      "state_mutation_gate": {
+        "required": true,
+        "description": "No `.status = ` assignment to a Claim-like object exists anywhere under backend/src/types/*.py except inside the transition() function in state_machine.py (E1-S2 AC3, NFR-08). Verified by backend/tests/architecture/test_state_mutation_gate.py."
+      },
+      "files_must_exist": [
+        "backend/src/types/enums.py",
+        "backend/src/types/models.py",
+        "backend/src/types/exceptions.py",
+        "backend/src/types/state_machine.py"
+      ]
+    }
+  }
+}
