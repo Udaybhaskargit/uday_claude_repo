@@ -1,0 +1,2082 @@
+[
+  {
+    "id": "F001",
+    "category": "functional",
+    "story": "E1-S1",
+    "group": "A",
+    "description": "Define core domain types and enums: It exposes id, policy_id, claim_type (one of MOTOR|HEALTH|LIFE), incident_date, claim_amount (Decimal), status, and a nullable parent_claim_id.",
+    "steps": [
+      "Set up: The Claim type definition.",
+      "Action: Inspected.",
+      "Assert: It exposes id, policy_id, claim_type (one of MOTOR|HEALTH|LIFE), incident_date, claim_amount (Decimal), status, and a nullable parent_claim_id."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F002",
+    "category": "functional",
+    "story": "E1-S1",
+    "group": "A",
+    "description": "Define core domain types and enums: It contains exactly INTAKE, DOCS_PENDING, FRAUD_SCREENING, ASSESSMENT, AUTO_APPROVED, MANUAL_REVIEW, REJECTED, SETTLED, REOPENED, PROCESSING_FAILED.",
+    "steps": [
+      "Set up: The ClaimStatus enum.",
+      "Action: Enumerated.",
+      "Assert: It contains exactly INTAKE, DOCS_PENDING, FRAUD_SCREENING, ASSESSMENT, AUTO_APPROVED, MANUAL_REVIEW, REJECTED, SETTLED, REOPENED, PROCESSING_FAILED."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F003",
+    "category": "functional",
+    "story": "E1-S1",
+    "group": "A",
+    "description": "Define core domain types and enums: It contains exactly CUSTOMER, ASSESSOR, ADMIN.",
+    "steps": [
+      "Set up: The Role enum.",
+      "Action: Enumerated.",
+      "Assert: It contains exactly CUSTOMER, ASSESSOR, ADMIN."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F004",
+    "category": "functional",
+    "story": "E1-S1",
+    "group": "A",
+    "description": "Define core domain types and enums: It exposes policy_number, product_type, status (ACTIVE|LAPSED|...), sum_insured (Decimal), effective_date, expiry_date.",
+    "steps": [
+      "Set up: The Policy type.",
+      "Action: Inspected.",
+      "Assert: It exposes policy_number, product_type, status (ACTIVE|LAPSED|...), sum_insured (Decimal), effective_date, expiry_date."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F005",
+    "category": "functional",
+    "story": "E1-S1",
+    "group": "A",
+    "description": "Define core domain types and enums: It is a fixed-point Decimal type, never a floating-point float (NFR-01).",
+    "steps": [
+      "Set up: Any monetary field across Claim, Assessment, and Settlement.",
+      "Action: Its declared type is inspected.",
+      "Assert: It is a fixed-point Decimal type, never a floating-point float (NFR-01)."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F006",
+    "category": "functional",
+    "story": "E1-S2",
+    "group": "A",
+    "description": "Build the claim state machine transition gate: The claim status becomes FRAUD_SCREENING.",
+    "steps": [
+      "Set up: A claim in DOCS_PENDING and event DOCS_VERIFIED.",
+      "Action: Transition() is called.",
+      "Assert: The claim status becomes FRAUD_SCREENING."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F007",
+    "category": "functional",
+    "story": "E1-S2",
+    "group": "A",
+    "description": "Build the claim state machine transition gate: It raises InvalidClaimStateException and the claim status is unchanged.",
+    "steps": [
+      "Set up: A claim in SETTLED and event SUBMIT_FNOL (an invalid transition for that state).",
+      "Action: Transition() is called.",
+      "Assert: It raises InvalidClaimStateException and the claim status is unchanged."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F008",
+    "category": "functional",
+    "story": "E1-S2",
+    "group": "A",
+    "description": "Build the claim state machine transition gate: Each appears as a key with an explicit set of valid outgoing events and no implicit fallthrough.",
+    "steps": [
+      "Set up: The transition table.",
+      "Action: Every ClaimStatus value is checked.",
+      "Assert: Each appears as a key with an explicit set of valid outgoing events and no implicit fallthrough."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F009",
+    "category": "functional",
+    "story": "E1-S2",
+    "group": "A",
+    "description": "Build the claim state machine transition gate: A ClaimStateTransition record (from_state, to_state, event, timestamp) is returned for the caller to persist.",
+    "steps": [
+      "Set up: A successful transition.",
+      "Action: It completes.",
+      "Assert: A ClaimStateTransition record (from_state, to_state, event, timestamp) is returned for the caller to persist."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F010",
+    "category": "functional",
+    "story": "E1-S3",
+    "group": "A",
+    "description": "Define reason codes and domain exceptions: It contains exactly POLICY_INACTIVE, ZERO_PAYABLE_AMOUNT, FRAUD_FLAG, AUTO_APPROVED_LOW_RISK, HIGH_VALUE_REVIEW, DOCS_INCOMPLETE.",
+    "steps": [
+      "Set up: The ReasonCode enum.",
+      "Action: Enumerated.",
+      "Assert: It contains exactly POLICY_INACTIVE, ZERO_PAYABLE_AMOUNT, FRAUD_FLAG, AUTO_APPROVED_LOW_RISK, HIGH_VALUE_REVIEW, DOCS_INCOMPLETE."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F011",
+    "category": "functional",
+    "story": "E1-S3",
+    "group": "A",
+    "description": "Define reason codes and domain exceptions: It carries the policy_number and incident_date that failed validation.",
+    "steps": [
+      "Set up: PolicyNotActiveException.",
+      "Action: Raised.",
+      "Assert: It carries the policy_number and incident_date that failed validation."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F012",
+    "category": "functional",
+    "story": "E1-S3",
+    "group": "A",
+    "description": "Define reason codes and domain exceptions: It carries the policy_number and incident_date of the conflicting claim.",
+    "steps": [
+      "Set up: DuplicateClaimException.",
+      "Action: Raised.",
+      "Assert: It carries the policy_number and incident_date of the conflicting claim."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F013",
+    "category": "functional",
+    "story": "E1-S3",
+    "group": "A",
+    "description": "Define reason codes and domain exceptions: Its type maps to exactly one HTTP status code (409 for duplicate, 422 for policy-inactive, 409 for invalid transition).",
+    "steps": [
+      "Set up: Any domain exception in this module.",
+      "Action: Caught by the API layer.",
+      "Assert: Its type maps to exactly one HTTP status code (409 for duplicate, 422 for policy-inactive, 409 for invalid transition)."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F014",
+    "category": "functional",
+    "story": "E2-S1",
+    "group": "B",
+    "description": "Load fraud rule configuration from declarative config: It contains exactly 5 rules matching BRD section 11 weights: ratio>0.8 (+40), filed within 3 days (+25), more than 2 claims in 90 days (+30), motor missing FIR (+15), round number divisible by 10000 (+10).",
+    "steps": [
+      "Set up: Config/fraud-rules.json.",
+      "Action: Loaded at startup.",
+      "Assert: It contains exactly 5 rules matching BRD section 11 weights: ratio>0.8 (+40), filed within 3 days (+25), more than 2 claims in 90 days (+30), motor missing FIR (+15), round number divisible by 10000 (+10)."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F015",
+    "category": "functional",
+    "story": "E2-S1",
+    "group": "B",
+    "description": "Load fraud rule configuration from declarative config: Its value is 60.",
+    "steps": [
+      "Set up: The loaded config.",
+      "Action: The flag threshold is read.",
+      "Assert: Its value is 60."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F016",
+    "category": "functional",
+    "story": "E2-S1",
+    "group": "B",
+    "description": "Load fraud rule configuration from declarative config: It raises a typed config error at startup rather than the app starting with silent defaults.",
+    "steps": [
+      "Set up: The config loader.",
+      "Action: The file is missing or malformed.",
+      "Assert: It raises a typed config error at startup rather than the app starting with silent defaults."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F017",
+    "category": "functional",
+    "story": "E2-S1",
+    "group": "B",
+    "description": "Load fraud rule configuration from declarative config: The fraud service picks up the new value on next load.",
+    "steps": [
+      "Set up: The threshold value.",
+      "Action: Changed in the config file only with no code change.",
+      "Assert: The fraud service picks up the new value on next load."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F018",
+    "category": "functional",
+    "story": "E2-S2",
+    "group": "B",
+    "description": "Load deductible, co-pay, and decision threshold configuration: Motor has deductible 5000 and co_pay_pct 0, health has deductible 1000 and co_pay_pct 10, life has deductible 0 and co_pay_pct 0.",
+    "steps": [
+      "Set up: Config/assessment-rules.json.",
+      "Action: Loaded.",
+      "Assert: Motor has deductible 5000 and co_pay_pct 0, health has deductible 1000 and co_pay_pct 10, life has deductible 0 and co_pay_pct 0."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F019",
+    "category": "functional",
+    "story": "E2-S2",
+    "group": "B",
+    "description": "Load deductible, co-pay, and decision threshold configuration: Auto_approve_ceiling equals 50000.",
+    "steps": [
+      "Set up: The decision config.",
+      "Action: Loaded.",
+      "Assert: Auto_approve_ceiling equals 50000."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F020",
+    "category": "functional",
+    "story": "E2-S2",
+    "group": "B",
+    "description": "Load deductible, co-pay, and decision threshold configuration: The loader raises a typed UnknownClaimTypeError.",
+    "steps": [
+      "Set up: The config.",
+      "Action: A claim_type outside {motor, health, life} is requested.",
+      "Assert: The loader raises a typed UnknownClaimTypeError."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F021",
+    "category": "functional",
+    "story": "E2-S3",
+    "group": "B",
+    "description": "Centralize application and role configuration: It exposes db_path, backend_port (8000), and frontend_port (5173).",
+    "steps": [
+      "Set up: AppConfig.",
+      "Action: Loaded.",
+      "Assert: It exposes db_path, backend_port (8000), and frontend_port (5173)."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F022",
+    "category": "functional",
+    "story": "E2-S3",
+    "group": "B",
+    "description": "Centralize application and role configuration: It equals exactly CUSTOMER, ASSESSOR, ADMIN, matching the Role enum in Types.",
+    "steps": [
+      "Set up: AppConfig.valid_roles.",
+      "Action: Enumerated.",
+      "Assert: It equals exactly CUSTOMER, ASSESSOR, ADMIN, matching the Role enum in Types."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F023",
+    "category": "functional",
+    "story": "E2-S3",
+    "group": "B",
+    "description": "Centralize application and role configuration: It raises a typed config error naming the missing variable.",
+    "steps": [
+      "Set up: A missing required environment variable with no default.",
+      "Action: AppConfig loads.",
+      "Assert: It raises a typed config error naming the missing variable."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F024",
+    "category": "functional",
+    "story": "E3-S1",
+    "group": "C",
+    "description": "Write append-only numbered SQLite migrations: Every file matches NNNN_description.sql and NNNN is strictly increasing with no gaps.",
+    "steps": [
+      "Set up: The migrations/ directory.",
+      "Action: Listed.",
+      "Assert: Every file matches NNNN_description.sql and NNNN is strictly increasing with no gaps."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F025",
+    "category": "functional",
+    "story": "E3-S1",
+    "group": "C",
+    "description": "Write append-only numbered SQLite migrations: All 9 tables exist: policies, claims, claim_documents, fraud_screenings, assessments, decisions, settlements, claim_state_transitions, admin_overrides.",
+    "steps": [
+      "Set up: A fresh SQLite file.",
+      "Action: The migration runner executes.",
+      "Assert: All 9 tables exist: policies, claims, claim_documents, fraud_screenings, assessments, decisions, settlements, claim_state_transitions, admin_overrides."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F026",
+    "category": "functional",
+    "story": "E3-S1",
+    "group": "C",
+    "description": "Write append-only numbered SQLite migrations: It is idempotent: already-applied migrations are skipped with no error.",
+    "steps": [
+      "Set up: The migration runner.",
+      "Action: Run twice against the same database.",
+      "Assert: It is idempotent: already-applied migrations are skipped with no error."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F027",
+    "category": "functional",
+    "story": "E3-S1",
+    "group": "C",
+    "description": "Write append-only numbered SQLite migrations: A mismatch, indicating a post-application edit, raises a startup error.",
+    "steps": [
+      "Set up: An already-applied migration file.",
+      "Action: Its checksum is recomputed at startup.",
+      "Assert: A mismatch, indicating a post-application edit, raises a startup error."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F028",
+    "category": "functional",
+    "story": "E3-S2",
+    "group": "D",
+    "description": "Build the policy repository: It returns the Policy with matching sum_insured and dates.",
+    "steps": [
+      "Set up: A seeded active policy.",
+      "Action: Get_by_number() is called.",
+      "Assert: It returns the Policy with matching sum_insured and dates."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F029",
+    "category": "functional",
+    "story": "E3-S2",
+    "group": "D",
+    "description": "Build the policy repository: It returns None rather than raising, so the caller can produce a domain-level error.",
+    "steps": [
+      "Set up: A policy number that does not exist.",
+      "Action: Get_by_number() is called.",
+      "Assert: It returns None rather than raising, so the caller can produce a domain-level error."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F030",
+    "category": "functional",
+    "story": "E3-S2",
+    "group": "D",
+    "description": "Build the policy repository: It returns False.",
+    "steps": [
+      "Set up: A policy.",
+      "Action: Is_active_on(date) is called with a date outside [effective_date, expiry_date].",
+      "Assert: It returns False."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F031",
+    "category": "functional",
+    "story": "E3-S3",
+    "group": "D",
+    "description": "Build the claim repository: A row is inserted with status='INTAKE' and the generated id is returned.",
+    "steps": [
+      "Set up: A new claim payload.",
+      "Action: Create() is called.",
+      "Assert: A row is inserted with status='INTAKE' and the generated id is returned."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F032",
+    "category": "functional",
+    "story": "E3-S3",
+    "group": "D",
+    "description": "Build the claim repository: The row's status column is updated and a claim_state_transitions row is inserted in the same transaction.",
+    "steps": [
+      "Set up: An existing claim and a valid event from the E1-S2 transition table.",
+      "Action: Apply_transition() is called.",
+      "Assert: The row's status column is updated and a claim_state_transitions row is inserted in the same transaction."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F033",
+    "category": "functional",
+    "story": "E3-S3",
+    "group": "D",
+    "description": "Build the claim repository: No row is mutated and InvalidClaimStateException propagates.",
+    "steps": [
+      "Set up: An existing claim and an invalid event.",
+      "Action: Apply_transition() is called.",
+      "Assert: No row is mutated and InvalidClaimStateException propagates."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F034",
+    "category": "functional",
+    "story": "E3-S3",
+    "group": "D",
+    "description": "Build the claim repository: Only matching rows are returned.",
+    "steps": [
+      "Set up: Claims of mixed status and product.",
+      "Action: List_by_status_and_product() is called with filters.",
+      "Assert: Only matching rows are returned."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F035",
+    "category": "functional",
+    "story": "E3-S3",
+    "group": "D",
+    "description": "Build the claim repository: It returns True.",
+    "steps": [
+      "Set up: A policy_number and incident_date matching an existing non-void claim.",
+      "Action: Exists_duplicate() is called.",
+      "Assert: It returns True."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F036",
+    "category": "functional",
+    "story": "E3-S4",
+    "group": "D",
+    "description": "Build the append-only audit repositories: Both rows persist with history preserved and no overwrite.",
+    "steps": [
+      "Set up: A FraudScreening record.",
+      "Action: Insert() is called twice for the same claim.",
+      "Assert: Both rows persist with history preserved and no overwrite."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F037",
+    "category": "functional",
+    "story": "E3-S4",
+    "group": "D",
+    "description": "Build the append-only audit repositories: It exposes no update() or delete() method for any of the five entities.",
+    "steps": [
+      "Set up: The repository module.",
+      "Action: Its public interface is inspected.",
+      "Assert: It exposes no update() or delete() method for any of the five entities."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F038",
+    "category": "functional",
+    "story": "E3-S4",
+    "group": "D",
+    "description": "Build the append-only audit repositories: It returns the most recently inserted Assessment row for that claim.",
+    "steps": [
+      "Set up: A claim id.",
+      "Action: Get_latest_assessment() is called.",
+      "Assert: It returns the most recently inserted Assessment row for that claim."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F039",
+    "category": "functional",
+    "story": "E3-S4",
+    "group": "D",
+    "description": "Build the append-only audit repositories: It returns all override rows ordered by timestamp ascending.",
+    "steps": [
+      "Set up: A claim id.",
+      "Action: List_admin_overrides() is called.",
+      "Assert: It returns all override rows ordered by timestamp ascending."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F040",
+    "category": "functional",
+    "story": "E4-S1",
+    "group": "E",
+    "description": "Implement the FNOL intake service: A Claim is created with claim_type='MOTOR' and two ClaimDocument rows (POLICE_FIR, INVOICE) each MISSING.",
+    "steps": [
+      "Set up: A valid motor FNOL payload.",
+      "Action: Submit_fnol() is called.",
+      "Assert: A Claim is created with claim_type='MOTOR' and two ClaimDocument rows (POLICE_FIR, INVOICE) each MISSING."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F041",
+    "category": "functional",
+    "story": "E4-S1",
+    "group": "E",
+    "description": "Implement the FNOL intake service: The checklist rows are exactly HOSPITAL_BILL and DISCHARGE_SUMMARY.",
+    "steps": [
+      "Set up: A valid health FNOL payload.",
+      "Action: Submitted.",
+      "Assert: The checklist rows are exactly HOSPITAL_BILL and DISCHARGE_SUMMARY."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F042",
+    "category": "functional",
+    "story": "E4-S1",
+    "group": "E",
+    "description": "Implement the FNOL intake service: The checklist row is exactly DEATH_CERTIFICATE.",
+    "steps": [
+      "Set up: A valid life FNOL payload.",
+      "Action: Submitted.",
+      "Assert: The checklist row is exactly DEATH_CERTIFICATE."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F043",
+    "category": "functional",
+    "story": "E4-S1",
+    "group": "E",
+    "description": "Implement the FNOL intake service: The claim's initial status is INTAKE and, once checklist rows are attached, it transitions to DOCS_PENDING.",
+    "steps": [
+      "Set up: A successful submission.",
+      "Action: It completes.",
+      "Assert: The claim's initial status is INTAKE and, once checklist rows are attached, it transitions to DOCS_PENDING."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F044",
+    "category": "functional",
+    "story": "E4-S2",
+    "group": "F",
+    "description": "Enforce policy-active validation at incident date: PolicyNotActiveException is raised and no Claim row is created.",
+    "steps": [
+      "Set up: A policy with status='LAPSED'.",
+      "Action: Submit_fnol() is called referencing it.",
+      "Assert: PolicyNotActiveException is raised and no Claim row is created."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F045",
+    "category": "functional",
+    "story": "E4-S2",
+    "group": "F",
+    "description": "Enforce policy-active validation at incident date: PolicyNotActiveException is raised.",
+    "steps": [
+      "Set up: An active policy but an incident_date after expiry_date.",
+      "Action: Submitted.",
+      "Assert: PolicyNotActiveException is raised."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F046",
+    "category": "functional",
+    "story": "E4-S2",
+    "group": "F",
+    "description": "Enforce policy-active validation at incident date: No exception is raised and intake proceeds.",
+    "steps": [
+      "Set up: An active policy with incident_date within [effective_date, expiry_date].",
+      "Action: Submitted.",
+      "Assert: No exception is raised and intake proceeds."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F047",
+    "category": "functional",
+    "story": "E4-S2",
+    "group": "F",
+    "description": "Enforce policy-active validation at incident date: The response uses reason code POLICY_INACTIVE.",
+    "steps": [
+      "Set up: PolicyNotActiveException reaches the API layer.",
+      "Action: Serialized.",
+      "Assert: The response uses reason code POLICY_INACTIVE."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F048",
+    "category": "functional",
+    "story": "E4-S3",
+    "group": "F",
+    "description": "Detect and reject duplicate FNOL submissions: DuplicateClaimException is raised and no new Claim row is created.",
+    "steps": [
+      "Set up: An existing non-void claim for policy P on date D.",
+      "Action: A second FNOL for (P, D) is submitted.",
+      "Assert: DuplicateClaimException is raised and no new Claim row is created."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F049",
+    "category": "functional",
+    "story": "E4-S3",
+    "group": "F",
+    "description": "Detect and reject duplicate FNOL submissions: It succeeds and creates a second, independent claim.",
+    "steps": [
+      "Set up: An existing claim for policy P on date D1.",
+      "Action: A new FNOL for (P, D2) with D2 not equal to D1 is submitted.",
+      "Assert: It succeeds and creates a second, independent claim."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F050",
+    "category": "functional",
+    "story": "E4-S3",
+    "group": "F",
+    "description": "Detect and reject duplicate FNOL submissions: The HTTP response status is 409.",
+    "steps": [
+      "Set up: DuplicateClaimException reaches the API layer.",
+      "Action: Serialized.",
+      "Assert: The HTTP response status is 409."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F051",
+    "category": "functional",
+    "story": "E5-S1",
+    "group": "F",
+    "description": "Enforce the per-claim-type document checklist: It returns False and the claim remains DOCS_PENDING.",
+    "steps": [
+      "Set up: A motor claim with POLICE_FIR still MISSING.",
+      "Action: Check_documents_complete() is called.",
+      "Assert: It returns False and the claim remains DOCS_PENDING."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F052",
+    "category": "functional",
+    "story": "E5-S1",
+    "group": "F",
+    "description": "Enforce the per-claim-type document checklist: It returns True and the claim transitions to FRAUD_SCREENING.",
+    "steps": [
+      "Set up: A motor claim with both POLICE_FIR and INVOICE set to VERIFIED.",
+      "Action: Checked.",
+      "Assert: It returns True and the claim transitions to FRAUD_SCREENING."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F053",
+    "category": "functional",
+    "story": "E5-S1",
+    "group": "F",
+    "description": "Enforce the per-claim-type document checklist: Only HOSPITAL_BILL and DISCHARGE_SUMMARY are considered, ignoring motor/life document types.",
+    "steps": [
+      "Set up: A health claim.",
+      "Action: Its checklist is evaluated.",
+      "Assert: Only HOSPITAL_BILL and DISCHARGE_SUMMARY are considered, ignoring motor/life document types."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F054",
+    "category": "functional",
+    "story": "E5-S1",
+    "group": "F",
+    "description": "Enforce the per-claim-type document checklist: It raises a typed validation error.",
+    "steps": [
+      "Set up: An attempt to mark a document type that is not part of the claim's own claim-type checklist.",
+      "Action: Verify_document() is called.",
+      "Assert: It raises a typed validation error."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F055",
+    "category": "functional",
+    "story": "E5-S2",
+    "group": "E",
+    "description": "Implement the deterministic fraud scoring engine: The total is 40 and flagged is False, since 40 is below threshold 60.",
+    "steps": [
+      "Set up: A claim with a claim_amount/sum_insured ratio of 0.85 and no other rule triggers.",
+      "Action: Scored.",
+      "Assert: The total is 40 and flagged is False, since 40 is below threshold 60."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F056",
+    "category": "functional",
+    "story": "E5-S2",
+    "group": "E",
+    "description": "Implement the deterministic fraud scoring engine: The total is 65 (40+25) and flagged is True.",
+    "steps": [
+      "Set up: A claim filed 2 days after policy inception with a claim_amount/sum_insured ratio of 0.85.",
+      "Action: Scored.",
+      "Assert: The total is 65 (40+25) and flagged is True."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F057",
+    "category": "functional",
+    "story": "E5-S2",
+    "group": "E",
+    "description": "Implement the deterministic fraud scoring engine: Both runs produce an identical score and rule breakdown, demonstrating determinism.",
+    "steps": [
+      "Set up: The same claim inputs scored twice.",
+      "Action: The two results are compared.",
+      "Assert: Both runs produce an identical score and rule breakdown, demonstrating determinism."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F058",
+    "category": "functional",
+    "story": "E5-S2",
+    "group": "E",
+    "description": "Implement the deterministic fraud scoring engine: The +15 rule is included in the breakdown with its rule name.",
+    "steps": [
+      "Set up: A motor claim missing the POLICE_FIR document.",
+      "Action: Scored.",
+      "Assert: The +15 rule is included in the breakdown with its rule name."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F059",
+    "category": "functional",
+    "story": "E5-S3",
+    "group": "F",
+    "description": "Persist fraud screenings and gate the pipeline: The FraudScreening row stores the threshold that was active at scoring time, not the current config value.",
+    "steps": [
+      "Set up: A scored claim.",
+      "Action: The result is persisted.",
+      "Assert: The FraudScreening row stores the threshold that was active at scoring time, not the current config value."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F060",
+    "category": "functional",
+    "story": "E5-S3",
+    "group": "F",
+    "description": "Persist fraud screenings and gate the pipeline: The claim moves toward MANUAL_REVIEW with reason code FRAUD_FLAG.",
+    "steps": [
+      "Set up: A flagged=True result.",
+      "Action: Persisted.",
+      "Assert: The claim moves toward MANUAL_REVIEW with reason code FRAUD_FLAG."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F061",
+    "category": "functional",
+    "story": "E5-S3",
+    "group": "F",
+    "description": "Persist fraud screenings and gate the pipeline: The claim moves toward ASSESSMENT.",
+    "steps": [
+      "Set up: A flagged=False result.",
+      "Action: Persisted.",
+      "Assert: The claim moves toward ASSESSMENT."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F062",
+    "category": "functional",
+    "story": "E5-S3",
+    "group": "F",
+    "description": "Persist fraud screenings and gate the pipeline: Both rows remain independently queryable with no overwrite, per NFR-02.",
+    "steps": [
+      "Set up: Two screenings on the same claim, for example after a retry.",
+      "Action: Both are persisted.",
+      "Assert: Both rows remain independently queryable with no overwrite, per NFR-02."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F063",
+    "category": "functional",
+    "story": "E6-S1",
+    "group": "E",
+    "description": "Implement the assessment service: Payable_amount equals 35000 (40000 minus the 5000 deductible, no co-pay).",
+    "steps": [
+      "Set up: A motor claim with claim_amount 40000 and sum_insured 100000.",
+      "Action: Assessed.",
+      "Assert: Payable_amount equals 35000 (40000 minus the 5000 deductible, no co-pay)."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F064",
+    "category": "functional",
+    "story": "E6-S1",
+    "group": "E",
+    "description": "Implement the assessment service: The 1000 deductible and 10% co-pay of 19000 (=1900) yield payable_amount 17100.",
+    "steps": [
+      "Set up: A health claim with claim_amount 20000.",
+      "Action: Assessed.",
+      "Assert: The 1000 deductible and 10% co-pay of 19000 (=1900) yield payable_amount 17100."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F065",
+    "category": "functional",
+    "story": "E6-S1",
+    "group": "E",
+    "description": "Implement the assessment service: Payable_amount equals min(200000,150000) = 150000 with no deductions.",
+    "steps": [
+      "Set up: A life claim with claim_amount 200000 and sum_insured 150000.",
+      "Action: Assessed.",
+      "Assert: Payable_amount equals min(200000,150000) = 150000 with no deductions."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F066",
+    "category": "functional",
+    "story": "E6-S1",
+    "group": "E",
+    "description": "Implement the assessment service: Payable_amount is clamped to 0 and is never negative.",
+    "steps": [
+      "Set up: Inputs that would mathematically compute negative.",
+      "Action: Assessed.",
+      "Assert: Payable_amount is clamped to 0 and is never negative."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F067",
+    "category": "functional",
+    "story": "E6-S1",
+    "group": "E",
+    "description": "Implement the assessment service: Payable_amount is a Decimal and the computation used no float arithmetic at any step.",
+    "steps": [
+      "Set up: Any assessment result.",
+      "Action: Its type is inspected.",
+      "Assert: Payable_amount is a Decimal and the computation used no float arithmetic at any step."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F068",
+    "category": "functional",
+    "story": "E6-S2",
+    "group": "G",
+    "description": "Implement the decision engine: The outcome is REJECT with reason code ZERO_PAYABLE_AMOUNT.",
+    "steps": [
+      "Set up: Payable_amount == 0.",
+      "Action: Decided.",
+      "Assert: The outcome is REJECT with reason code ZERO_PAYABLE_AMOUNT."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F069",
+    "category": "functional",
+    "story": "E6-S2",
+    "group": "G",
+    "description": "Implement the decision engine: The outcome is MANUAL_REVIEW with reason code FRAUD_FLAG.",
+    "steps": [
+      "Set up: A fraud-flagged claim with nonzero payable_amount.",
+      "Action: Decided.",
+      "Assert: The outcome is MANUAL_REVIEW with reason code FRAUD_FLAG."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F070",
+    "category": "functional",
+    "story": "E6-S2",
+    "group": "G",
+    "description": "Implement the decision engine: The outcome is AUTO_APPROVE with reason code AUTO_APPROVED_LOW_RISK.",
+    "steps": [
+      "Set up: An unflagged claim with payable_amount of 30000, at or below the 50000 ceiling.",
+      "Action: Decided.",
+      "Assert: The outcome is AUTO_APPROVE with reason code AUTO_APPROVED_LOW_RISK."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F071",
+    "category": "functional",
+    "story": "E6-S2",
+    "group": "G",
+    "description": "Implement the decision engine: The outcome is MANUAL_REVIEW with reason code HIGH_VALUE_REVIEW.",
+    "steps": [
+      "Set up: An unflagged claim with payable_amount of 75000, above the ceiling.",
+      "Action: Decided.",
+      "Assert: The outcome is MANUAL_REVIEW with reason code HIGH_VALUE_REVIEW."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F072",
+    "category": "functional",
+    "story": "E6-S2",
+    "group": "G",
+    "description": "Implement the decision engine: The Decision row is append-only and records decided_by as either 'system' or an assessor actor id.",
+    "steps": [
+      "Set up: A decision result.",
+      "Action: Persisted.",
+      "Assert: The Decision row is append-only and records decided_by as either 'system' or an assessor actor id."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F073",
+    "category": "functional",
+    "story": "E6-S3",
+    "group": "H",
+    "description": "Orchestrate the claim pipeline with failure handling: It ends in exactly one terminal state among AUTO_APPROVED, MANUAL_REVIEW, REJECTED, with a matching Decision row.",
+    "steps": [
+      "Set up: A claim with complete documents and no fraud flag.",
+      "Action: Run_pipeline() is invoked.",
+      "Assert: It ends in exactly one terminal state among AUTO_APPROVED, MANUAL_REVIEW, REJECTED, with a matching Decision row."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F074",
+    "category": "functional",
+    "story": "E6-S3",
+    "group": "H",
+    "description": "Orchestrate the claim pipeline with failure handling: It halts at DOCS_PENDING and does not call the fraud or assessment services.",
+    "steps": [
+      "Set up: A claim with incomplete documents.",
+      "Action: Run_pipeline() is invoked.",
+      "Assert: It halts at DOCS_PENDING and does not call the fraud or assessment services."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F075",
+    "category": "functional",
+    "story": "E6-S3",
+    "group": "H",
+    "description": "Orchestrate the claim pipeline with failure handling: The claim transitions to PROCESSING_FAILED and the error is logged as structured JSON with no PII fields, per NFR-06.",
+    "steps": [
+      "Set up: The fraud or assessment step raises an unexpected exception.",
+      "Action: Caught by the orchestrator.",
+      "Assert: The claim transitions to PROCESSING_FAILED and the error is logged as structured JSON with no PII fields, per NFR-06."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F076",
+    "category": "functional",
+    "story": "E6-S3",
+    "group": "H",
+    "description": "Orchestrate the claim pipeline with failure handling: The pipeline re-runs starting from the failed step.",
+    "steps": [
+      "Set up: A claim in PROCESSING_FAILED.",
+      "Action: An admin calls retry_pipeline().",
+      "Assert: The pipeline re-runs starting from the failed step."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F077",
+    "category": "functional",
+    "story": "E7-S1",
+    "group": "I",
+    "description": "Implement the settlement service: A Settlement row is created with the decision's payable_amount and the claim transitions to SETTLED.",
+    "steps": [
+      "Set up: A decision outcome of AUTO_APPROVE.",
+      "Action: Settlement runs.",
+      "Assert: A Settlement row is created with the decision's payable_amount and the claim transitions to SETTLED."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F078",
+    "category": "functional",
+    "story": "E7-S1",
+    "group": "I",
+    "description": "Implement the settlement service: No update method exists, since the repository (E3-S4) enforces immutability.",
+    "steps": [
+      "Set up: A created Settlement row.",
+      "Action: Any code path attempts to modify it.",
+      "Assert: No update method exists, since the repository (E3-S4) enforces immutability."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F079",
+    "category": "functional",
+    "story": "E7-S1",
+    "group": "I",
+    "description": "Implement the settlement service: It returns a stub confirmation reference without contacting any real external payment rail.",
+    "steps": [
+      "Set up: Settlement completes.",
+      "Action: The stubbed payment trigger is invoked.",
+      "Assert: It returns a stub confirmation reference without contacting any real external payment rail."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F080",
+    "category": "functional",
+    "story": "E7-S1",
+    "group": "I",
+    "description": "Implement the settlement service: It is refused with a typed error and no Settlement row is created for a non-approved claim.",
+    "steps": [
+      "Set up: A REJECTED claim.",
+      "Action: Settlement is attempted.",
+      "Assert: It is refused with a typed error and no Settlement row is created for a non-approved claim."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F081",
+    "category": "functional",
+    "story": "E7-S2",
+    "group": "E",
+    "description": "Implement the reopen/dispute service: A new Claim row is created with parent_claim_id set to the original's id and status='INTAKE'.",
+    "steps": [
+      "Set up: A SETTLED claim.",
+      "Action: Reopen() is called.",
+      "Assert: A new Claim row is created with parent_claim_id set to the original's id and status='INTAKE'."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F082",
+    "category": "functional",
+    "story": "E7-S2",
+    "group": "E",
+    "description": "Implement the reopen/dispute service: Its historical Decision, Settlement, and Assessment rows are unchanged: still readable, not deleted or edited.",
+    "steps": [
+      "Set up: The reopen call succeeds.",
+      "Action: The original claim is re-read.",
+      "Assert: Its historical Decision, Settlement, and Assessment rows are unchanged: still readable, not deleted or edited."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F083",
+    "category": "functional",
+    "story": "E7-S2",
+    "group": "E",
+    "description": "Implement the reopen/dispute service: It is REOPENED, having been set via the state-machine gate rather than a direct column write.",
+    "steps": [
+      "Set up: The reopen call succeeds.",
+      "Action: The original claim's status is re-read.",
+      "Assert: It is REOPENED, having been set via the state-machine gate rather than a direct column write."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F084",
+    "category": "functional",
+    "story": "E7-S2",
+    "group": "E",
+    "description": "Implement the reopen/dispute service: It raises InvalidClaimStateException.",
+    "steps": [
+      "Set up: A claim that is not SETTLED, for example one in MANUAL_REVIEW.",
+      "Action: Reopen() is called.",
+      "Assert: It raises InvalidClaimStateException."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F085",
+    "category": "security",
+    "story": "E8-S1",
+    "group": "C",
+    "description": "Implement the stubbed role-based auth dependency: The route handler receives an ActorContext with role=ASSESSOR and the given actor_id.",
+    "steps": [
+      "Set up: A request with X-Role: ASSESSOR and a valid actor id.",
+      "Action: The dependency resolves.",
+      "Assert: The route handler receives an ActorContext with role=ASSESSOR and the given actor_id."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F086",
+    "category": "security",
+    "story": "E8-S1",
+    "group": "C",
+    "description": "Implement the stubbed role-based auth dependency: The request is rejected with HTTP 401 before the route handler runs.",
+    "steps": [
+      "Set up: A request with X-Role: SUPERVISOR, a value not in valid_roles.",
+      "Action: The dependency resolves.",
+      "Assert: The request is rejected with HTTP 401 before the route handler runs."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F087",
+    "category": "security",
+    "story": "E8-S1",
+    "group": "C",
+    "description": "Implement the stubbed role-based auth dependency: It is rejected with HTTP 401.",
+    "steps": [
+      "Set up: A request missing the X-Role header entirely.",
+      "Action: The dependency resolves.",
+      "Assert: It is rejected with HTTP 401."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F088",
+    "category": "security",
+    "story": "E8-S1",
+    "group": "C",
+    "description": "Implement the stubbed role-based auth dependency: It is rejected with HTTP 403.",
+    "steps": [
+      "Set up: A route decorated with require_role(ADMIN).",
+      "Action: A request arrives with X-Role: ASSESSOR.",
+      "Assert: It is rejected with HTTP 403."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F089",
+    "category": "functional",
+    "story": "E8-S2",
+    "group": "E",
+    "description": "Implement the admin override service: An AdminOverride row is inserted recording the admin actor, command, reason_code, and timestamp.",
+    "steps": [
+      "Set up: An admin actor and a target claim.",
+      "Action: Override() is called with a command and reason code.",
+      "Assert: An AdminOverride row is inserted recording the admin actor, command, reason_code, and timestamp."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F090",
+    "category": "functional",
+    "story": "E8-S2",
+    "group": "E",
+    "description": "Implement the admin override service: It raises a typed validation error and no override row is inserted.",
+    "steps": [
+      "Set up: Override() is called without a reason_code.",
+      "Action: Validated.",
+      "Assert: It raises a typed validation error and no override row is inserted."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F091",
+    "category": "functional",
+    "story": "E8-S2",
+    "group": "E",
+    "description": "Implement the admin override service: The status change goes through the E1-S2 transition gate, and an invalid target status raises InvalidClaimStateException.",
+    "steps": [
+      "Set up: An override that changes claim status.",
+      "Action: Applied.",
+      "Assert: The status change goes through the E1-S2 transition gate, and an invalid target status raises InvalidClaimStateException."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F092",
+    "category": "functional",
+    "story": "E8-S2",
+    "group": "E",
+    "description": "Implement the admin override service: It fails with InvalidClaimStateException rather than silently double-applying, per BRD section 11 concurrency handling.",
+    "steps": [
+      "Set up: Two admins concurrently overriding the same claim.",
+      "Action: The second call runs against the now-stale state.",
+      "Assert: It fails with InvalidClaimStateException rather than silently double-applying, per BRD section 11 concurrency handling."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F093",
+    "category": "security",
+    "story": "E9-S1",
+    "group": "I",
+    "description": "Expose the claims API for intake, tracking, and dispute: The response is 201 with a body containing the new claim_id and initial status.",
+    "steps": [
+      "Set up: A valid motor FNOL body.",
+      "Action: POST /api/claims is called with X-Role: CUSTOMER.",
+      "Assert: The response is 201 with a body containing the new claim_id and initial status."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F094",
+    "category": "integration",
+    "story": "E9-S1",
+    "group": "I",
+    "description": "Expose the claims API for intake, tracking, and dispute: The response is 409 with reason_code DUPLICATE_CLAIM.",
+    "steps": [
+      "Set up: A duplicate FNOL.",
+      "Action: Submitted.",
+      "Assert: The response is 409 with reason_code DUPLICATE_CLAIM."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F095",
+    "category": "integration",
+    "story": "E9-S1",
+    "group": "I",
+    "description": "Expose the claims API for intake, tracking, and dispute: The response is 201 with the new sub-claim's id and parent_claim_id.",
+    "steps": [
+      "Set up: A SETTLED claim id.",
+      "Action: POST /api/claims/{id}/reopen is called.",
+      "Assert: The response is 201 with the new sub-claim's id and parent_claim_id."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F096",
+    "category": "integration",
+    "story": "E9-S1",
+    "group": "I",
+    "description": "Expose the claims API for intake, tracking, and dispute: The response body includes status, decision.reason_codes if decided, and a missing_documents list.",
+    "steps": [
+      "Set up: GET /api/claims/{id} on an existing claim.",
+      "Action: Called.",
+      "Assert: The response body includes status, decision.reason_codes if decided, and a missing_documents list."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F097",
+    "category": "security",
+    "story": "E9-S2",
+    "group": "G",
+    "description": "Expose the document verification API: The response lists only claims currently in DOCS_PENDING with their outstanding document types.",
+    "steps": [
+      "Set up: X-Role: ASSESSOR.",
+      "Action: GET /api/claims/documents/pending is called.",
+      "Assert: The response lists only claims currently in DOCS_PENDING with their outstanding document types."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F098",
+    "category": "integration",
+    "story": "E9-S2",
+    "group": "G",
+    "description": "Expose the document verification API: The response reflects the update and, once all items are verified, a follow-up GET shows the claim's status as FRAUD_SCREENING.",
+    "steps": [
+      "Set up: A claim's POLICE_FIR document.",
+      "Action: PATCH /api/claims/{id}/documents/{type} sets it to VERIFIED.",
+      "Assert: The response reflects the update and, once all items are verified, a follow-up GET shows the claim's status as FRAUD_SCREENING."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F099",
+    "category": "security",
+    "story": "E9-S2",
+    "group": "G",
+    "description": "Expose the document verification API: The response is 403.",
+    "steps": [
+      "Set up: X-Role: CUSTOMER.",
+      "Action: The same PATCH endpoint is called.",
+      "Assert: The response is 403."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F100",
+    "category": "security",
+    "story": "E9-S3",
+    "group": "H",
+    "description": "Expose the assessor workbench API: The response lists only claims whose latest FraudScreening.flagged is True.",
+    "steps": [
+      "Set up: X-Role: ASSESSOR.",
+      "Action: GET /api/claims/fraud-alerts is called.",
+      "Assert: The response lists only claims whose latest FraudScreening.flagged is True."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F101",
+    "category": "integration",
+    "story": "E9-S3",
+    "group": "H",
+    "description": "Expose the assessor workbench API: The response includes the fraud score and breakdown, the assessed payable_amount, and decision-rationale fields.",
+    "steps": [
+      "Set up: A claim in MANUAL_REVIEW.",
+      "Action: GET /api/claims/{id}/workbench is called.",
+      "Assert: The response includes the fraud score and breakdown, the assessed payable_amount, and decision-rationale fields."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F102",
+    "category": "integration",
+    "story": "E9-S3",
+    "group": "H",
+    "description": "Expose the assessor workbench API: The response is 200 and a new append-only Decision row is created with decided_by set to the assessor's actor id.",
+    "steps": [
+      "Set up: A claim in MANUAL_REVIEW.",
+      "Action: POST /api/claims/{id}/decision is called with an assessor's outcome and reason code.",
+      "Assert: The response is 200 and a new append-only Decision row is created with decided_by set to the assessor's actor id."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F103",
+    "category": "security",
+    "story": "E9-S4",
+    "group": "F",
+    "description": "Expose the admin API for queues, overrides, and audit trail: Only matching claims are returned.",
+    "steps": [
+      "Set up: X-Role: ADMIN.",
+      "Action: GET /api/admin/claims?status=MANUAL_REVIEW&product=MOTOR is called.",
+      "Assert: Only matching claims are returned."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F104",
+    "category": "security",
+    "story": "E9-S4",
+    "group": "F",
+    "description": "Expose the admin API for queues, overrides, and audit trail: The response lists every Settlement row with claim id, amount, and timestamp as an immutable audit trail.",
+    "steps": [
+      "Set up: X-Role: ADMIN.",
+      "Action: GET /api/admin/payouts is called.",
+      "Assert: The response lists every Settlement row with claim id, amount, and timestamp as an immutable audit trail."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F105",
+    "category": "security",
+    "story": "E9-S4",
+    "group": "F",
+    "description": "Expose the admin API for queues, overrides, and audit trail: The response is 200 and the created AdminOverride is visible in a subsequent GET /api/admin/claims/{id}/overrides.",
+    "steps": [
+      "Set up: X-Role: ADMIN.",
+      "Action: POST /api/admin/claims/{id}/override is called with a command and reason code.",
+      "Assert: The response is 200 and the created AdminOverride is visible in a subsequent GET /api/admin/claims/{id}/overrides."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F106",
+    "category": "security",
+    "story": "E9-S4",
+    "group": "F",
+    "description": "Expose the admin API for queues, overrides, and audit trail: The response is 403.",
+    "steps": [
+      "Set up: X-Role: ASSESSOR, not ADMIN.",
+      "Action: Any /api/admin/* endpoint is called.",
+      "Assert: The response is 403."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F107",
+    "category": "ui",
+    "story": "E10-S1",
+    "group": "J",
+    "description": "Build the FNOL submission form: All fields remain reachable without horizontal scrolling.",
+    "steps": [
+      "Set up: The form loaded at a mobile viewport of 375px wide.",
+      "Action: Rendered.",
+      "Assert: All fields remain reachable without horizontal scrolling."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F108",
+    "category": "ui",
+    "story": "E10-S1",
+    "group": "J",
+    "description": "Build the FNOL submission form: It shows exactly Hospital bill and Discharge summary toggles, not motor or life document labels.",
+    "steps": [
+      "Set up: A claim type of HEALTH selected.",
+      "Action: The checklist section renders.",
+      "Assert: It shows exactly Hospital bill and Discharge summary toggles, not motor or life document labels."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F109",
+    "category": "ui",
+    "story": "E10-S1",
+    "group": "J",
+    "description": "Build the FNOL submission form: An inline validation message appears and no API call is made.",
+    "steps": [
+      "Set up: A submission with a missing required field.",
+      "Action: Submit is clicked.",
+      "Assert: An inline validation message appears and no API call is made."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F110",
+    "category": "ui",
+    "story": "E10-S1",
+    "group": "J",
+    "description": "Build the FNOL submission form: The UI navigates to the claim tracker view for the new claim id.",
+    "steps": [
+      "Set up: A successful submission.",
+      "Action: The API returns 201.",
+      "Assert: The UI navigates to the claim tracker view for the new claim id."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F111",
+    "category": "ui",
+    "story": "E10-S2",
+    "group": "J",
+    "description": "Build the claim tracker view: It lists each outstanding document type distinctly from verified ones.",
+    "steps": [
+      "Set up: A claim in DOCS_PENDING.",
+      "Action: The tracker renders.",
+      "Assert: It lists each outstanding document type distinctly from verified ones."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F112",
+    "category": "ui",
+    "story": "E10-S2",
+    "group": "J",
+    "description": "Build the claim tracker view: The human-readable reason text, not just the raw code, is displayed.",
+    "steps": [
+      "Set up: A claim with outcome MANUAL_REVIEW and reason code HIGH_VALUE_REVIEW.",
+      "Action: Rendered.",
+      "Assert: The human-readable reason text, not just the raw code, is displayed."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F113",
+    "category": "ui",
+    "story": "E10-S2",
+    "group": "J",
+    "description": "Build the claim tracker view: The settled payout amount is displayed and a Dispute this claim action is visible.",
+    "steps": [
+      "Set up: A SETTLED claim.",
+      "Action: Rendered.",
+      "Assert: The settled payout amount is displayed and a Dispute this claim action is visible."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F114",
+    "category": "ui",
+    "story": "E10-S2",
+    "group": "J",
+    "description": "Build the claim tracker view: No dispute action is shown.",
+    "steps": [
+      "Set up: A claim that is not SETTLED.",
+      "Action: Rendered.",
+      "Assert: No dispute action is shown."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F115",
+    "category": "ui",
+    "story": "E10-S3",
+    "group": "K",
+    "description": "Build the dispute action flow: A confirmation dialog appears before any API call is made.",
+    "steps": [
+      "Set up: The Dispute this claim button on a SETTLED claim.",
+      "Action: Clicked.",
+      "Assert: A confirmation dialog appears before any API call is made."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F116",
+    "category": "ui",
+    "story": "E10-S3",
+    "group": "K",
+    "description": "Build the dispute action flow: The UI shows the new sub-claim id and a link to its tracker.",
+    "steps": [
+      "Set up: Confirmation.",
+      "Action: The reopen API call succeeds.",
+      "Assert: The UI shows the new sub-claim id and a link to its tracker."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F117",
+    "category": "ui",
+    "story": "E10-S3",
+    "group": "K",
+    "description": "Build the dispute action flow: A user-facing error message is shown and the original claim's displayed status is unchanged.",
+    "steps": [
+      "Set up: The reopen API call fails, for example with a 409 invalid state.",
+      "Action: The error returns.",
+      "Assert: A user-facing error message is shown and the original claim's displayed status is unchanged."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F118",
+    "category": "ui",
+    "story": "E11-S1",
+    "group": "H",
+    "description": "Build the document verification queue UI: Only claims in DOCS_PENDING appear, grouped or filterable by claim type.",
+    "steps": [
+      "Set up: The queue loaded.",
+      "Action: Rendered.",
+      "Assert: Only claims in DOCS_PENDING appear, grouped or filterable by claim type."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F119",
+    "category": "ui",
+    "story": "E11-S1",
+    "group": "H",
+    "description": "Build the document verification queue UI: That claim disappears from this queue on the next refresh.",
+    "steps": [
+      "Set up: A checklist item toggled to VERIFIED.",
+      "Action: The last outstanding item for a claim is verified.",
+      "Assert: That claim disappears from this queue on the next refresh."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F120",
+    "category": "security",
+    "story": "E11-S1",
+    "group": "H",
+    "description": "Build the document verification queue UI: The UI does not render the queue and shows an access-denied state instead.",
+    "steps": [
+      "Set up: The queue is accessed under an X-Role: CUSTOMER context.",
+      "Action: Requested.",
+      "Assert: The UI does not render the queue and shows an access-denied state instead."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F121",
+    "category": "ui",
+    "story": "E11-S2",
+    "group": "I",
+    "description": "Build the fraud alert queue UI: Each row shows the fraud score, the triggered rule names, and a link into the assessor workbench for that claim.",
+    "steps": [
+      "Set up: The queue loaded.",
+      "Action: Rendered.",
+      "Assert: Each row shows the fraud score, the triggered rule names, and a link into the assessor workbench for that claim."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F122",
+    "category": "ui",
+    "story": "E11-S2",
+    "group": "I",
+    "description": "Build the fraud alert queue UI: That claim no longer appears.",
+    "steps": [
+      "Set up: A claim's flag is cleared by a later re-screening.",
+      "Action: The queue refreshes.",
+      "Assert: That claim no longer appears."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F123",
+    "category": "security",
+    "story": "E11-S2",
+    "group": "I",
+    "description": "Build the fraud alert queue UI: The UI does not render the queue and shows an access-denied state instead.",
+    "steps": [
+      "Set up: The queue is accessed under an X-Role: CUSTOMER context.",
+      "Action: Requested.",
+      "Assert: The UI does not render the queue and shows an access-denied state instead."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F124",
+    "category": "ui",
+    "story": "E11-S3",
+    "group": "J",
+    "description": "Build the assessor workbench UI: It displays the fraud score and breakdown alongside the computed payable_amount.",
+    "steps": [
+      "Set up: A claim in MANUAL_REVIEW.",
+      "Action: The workbench renders.",
+      "Assert: It displays the fraud score and breakdown alongside the computed payable_amount."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F125",
+    "category": "ui",
+    "story": "E11-S3",
+    "group": "J",
+    "description": "Build the assessor workbench UI: The UI shows a confirmation and the claim is removed from the pending workbench list.",
+    "steps": [
+      "Set up: The assessor selects an outcome and reason code and submits.",
+      "Action: The API call succeeds.",
+      "Assert: The UI shows a confirmation and the claim is removed from the pending workbench list."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F126",
+    "category": "ui",
+    "story": "E11-S3",
+    "group": "J",
+    "description": "Build the assessor workbench UI: A validation message blocks the call.",
+    "steps": [
+      "Set up: The assessor attempts to submit without selecting an outcome.",
+      "Action: Submit is clicked.",
+      "Assert: A validation message blocks the call."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F127",
+    "category": "ui",
+    "story": "E11-S4",
+    "group": "G",
+    "description": "Build the admin dashboard UI: The claim queue table updates to match without a full page reload.",
+    "steps": [
+      "Set up: The dashboard loaded.",
+      "Action: The status/product filters are changed.",
+      "Assert: The claim queue table updates to match without a full page reload."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F128",
+    "category": "ui",
+    "story": "E11-S4",
+    "group": "G",
+    "description": "Build the admin dashboard UI: Rows are shown in reverse-chronological order and are read-only with no edit controls.",
+    "steps": [
+      "Set up: The payout audit trail section.",
+      "Action: Rendered.",
+      "Assert: Rows are shown in reverse-chronological order and are read-only with no edit controls."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F129",
+    "category": "ui",
+    "story": "E11-S4",
+    "group": "G",
+    "description": "Build the admin dashboard UI: The form blocks submission with a validation message.",
+    "steps": [
+      "Set up: The override action on a selected claim.",
+      "Action: Submitted without a reason code.",
+      "Assert: The form blocks submission with a validation message."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  },
+  {
+    "id": "F130",
+    "category": "ui",
+    "story": "E11-S4",
+    "group": "G",
+    "description": "Build the admin dashboard UI: The new override entry appears in that claim's audit history within the dashboard.",
+    "steps": [
+      "Set up: A successful override.",
+      "Action: The API confirms it.",
+      "Assert: The new override entry appears in that claim's audit history within the dashboard."
+    ],
+    "passes": false,
+    "last_evaluated": null,
+    "failure_reason": null,
+    "failure_layer": null
+  }
+]

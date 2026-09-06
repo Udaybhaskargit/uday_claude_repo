@@ -1,0 +1,14 @@
+{
+  "scoring": {
+    "weights": { "design_quality": 0.75, "originality": 0.5, "craft": 0.5, "functionality": 1.5 },
+    "threshold": 6,
+    "per_criterion_minimum": 4
+  },
+  "iteration": {
+    "max_iterations": 5,
+    "plateau_window": 3,
+    "plateau_delta": 0.3,
+    "pivot_after_plateau": false
+  },
+  "_note": "Internal-tool weighting chosen deliberately even though ClaimFlow has both a customer FNOL/tracking portal and an internal assessor/admin portal: the capstone rubric explicitly states visual polish is NOT evaluated, so design_quality/originality/craft are kept low and functionality (correct AC-01..AC-10 behavior) is weighted highest."
+}

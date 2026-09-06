@@ -1,0 +1,644 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ClaimFlow API",
+    "version": "1.0.0",
+    "description": "FNOL-to-settlement REST API for ClaimFlow (Horizon Insurance). Auth is a stubbed X-Role/X-Actor-Id header pair (E8-S1), not production-grade authentication."
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "Local development (init.sh)" }
+  ],
+  "components": {
+    "parameters": {
+      "XRole": {
+        "name": "X-Role",
+        "in": "header",
+        "required": true,
+        "schema": { "$ref": "#/components/schemas/Role" }
+      },
+      "XActorId": {
+        "name": "X-Actor-Id",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1 }
+      },
+      "ClaimIdPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "schemas": {
+      "Role": { "type": "string", "enum": ["CUSTOMER", "ASSESSOR", "ADMIN"] },
+      "ClaimType": { "type": "string", "enum": ["MOTOR", "HEALTH", "LIFE"] },
+      "ClaimStatus": {
+        "type": "string",
+        "enum": ["INTAKE", "DOCS_PENDING", "FRAUD_SCREENING", "ASSESSMENT", "AUTO_APPROVED", "MANUAL_REVIEW", "REJECTED", "SETTLED", "REOPENED", "PROCESSING_FAILED"]
+      },
+      "DocumentType": { "type": "string", "enum": ["POLICE_FIR", "INVOICE", "HOSPITAL_BILL", "DISCHARGE_SUMMARY", "DEATH_CERTIFICATE"] },
+      "VerificationStatus": { "type": "string", "enum": ["VERIFIED", "MISSING"] },
+      "DecisionOutcome": { "type": "string", "enum": ["AUTO_APPROVE", "MANUAL_REVIEW", "REJECT"] },
+      "ReasonCode": { "type": "string", "enum": ["POLICY_INACTIVE", "ZERO_PAYABLE_AMOUNT", "FRAUD_FLAG", "AUTO_APPROVED_LOW_RISK", "HIGH_VALUE_REVIEW", "DOCS_INCOMPLETE"] },
+      "ApiErrorCode": { "type": "string", "enum": ["POLICY_INACTIVE", "DUPLICATE_CLAIM", "INVALID_STATE_TRANSITION", "VALIDATION_ERROR", "UNKNOWN_CLAIM_TYPE", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "PROCESSING_FAILED"] },
+      "AdminOverrideCommand": { "type": "string", "enum": ["FORCE_APPROVE", "FORCE_REJECT", "FORCE_MANUAL_REVIEW", "FORCE_RETRY"] },
+      "Decimal": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$", "example": "35000.00" },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "$ref": "#/components/schemas/ApiErrorCode" },
+              "message": { "type": "string" },
+              "details": { "type": "object", "additionalProperties": true }
+            }
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": { "status": { "type": "string", "enum": ["ok"] } }
+      },
+      "ChecklistItem": {
+        "type": "object",
+        "required": ["document_type", "verification_status"],
+        "properties": {
+          "document_type": { "$ref": "#/components/schemas/DocumentType" },
+          "verification_status": { "$ref": "#/components/schemas/VerificationStatus" }
+        }
+      },
+      "FnolRequest": {
+        "type": "object",
+        "required": ["policy_number", "claim_type", "incident_date", "claim_amount"],
+        "properties": {
+          "policy_number": { "type": "string", "minLength": 1 },
+          "claim_type": { "$ref": "#/components/schemas/ClaimType" },
+          "incident_date": { "type": "string", "format": "date" },
+          "claim_amount": { "$ref": "#/components/schemas/Decimal" }
+        }
+      },
+      "FnolResponse": {
+        "type": "object",
+        "required": ["claim_id", "status", "checklist"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "status": { "$ref": "#/components/schemas/ClaimStatus" },
+          "checklist": { "type": "array", "items": { "$ref": "#/components/schemas/ChecklistItem" } }
+        }
+      },
+      "DecisionSummary": {
+        "type": "object",
+        "required": ["outcome", "reason_code", "decided_by", "created_at"],
+        "properties": {
+          "outcome": { "$ref": "#/components/schemas/DecisionOutcome" },
+          "reason_code": { "$ref": "#/components/schemas/ReasonCode" },
+          "decided_by": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SettlementSummary": {
+        "type": "object",
+        "required": ["settlement_id", "payout_amount", "payment_reference", "created_at"],
+        "properties": {
+          "settlement_id": { "type": "integer" },
+          "payout_amount": { "$ref": "#/components/schemas/Decimal" },
+          "payment_reference": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ClaimDetailResponse": {
+        "type": "object",
+        "required": ["claim_id", "claim_type", "status", "incident_date", "claim_amount", "missing_documents", "decision", "settlement", "parent_claim_id"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "claim_type": { "$ref": "#/components/schemas/ClaimType" },
+          "status": { "$ref": "#/components/schemas/ClaimStatus" },
+          "incident_date": { "type": "string", "format": "date" },
+          "claim_amount": { "$ref": "#/components/schemas/Decimal" },
+          "missing_documents": { "type": "array", "items": { "$ref": "#/components/schemas/DocumentType" } },
+          "decision": { "oneOf": [ { "$ref": "#/components/schemas/DecisionSummary" }, { "type": "null" } ] },
+          "settlement": { "oneOf": [ { "$ref": "#/components/schemas/SettlementSummary" }, { "type": "null" } ] },
+          "parent_claim_id": { "type": ["integer", "null"] }
+        }
+      },
+      "ReopenResponse": {
+        "type": "object",
+        "required": ["sub_claim_id", "parent_claim_id", "status"],
+        "properties": {
+          "sub_claim_id": { "type": "integer" },
+          "parent_claim_id": { "type": "integer" },
+          "status": { "$ref": "#/components/schemas/ClaimStatus" }
+        }
+      },
+      "PendingDocClaim": {
+        "type": "object",
+        "required": ["claim_id", "claim_type", "outstanding_documents"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "claim_type": { "$ref": "#/components/schemas/ClaimType" },
+          "outstanding_documents": { "type": "array", "items": { "$ref": "#/components/schemas/DocumentType" } }
+        }
+      },
+      "PendingDocsResponse": {
+        "type": "object",
+        "required": ["claims"],
+        "properties": { "claims": { "type": "array", "items": { "$ref": "#/components/schemas/PendingDocClaim" } } }
+      },
+      "DocumentPatchRequest": {
+        "type": "object",
+        "required": ["verification_status"],
+        "properties": { "verification_status": { "$ref": "#/components/schemas/VerificationStatus" } }
+      },
+      "DocumentPatchResponse": {
+        "type": "object",
+        "required": ["claim_id", "document_type", "verification_status", "claim_status"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "document_type": { "$ref": "#/components/schemas/DocumentType" },
+          "verification_status": { "$ref": "#/components/schemas/VerificationStatus" },
+          "claim_status": { "$ref": "#/components/schemas/ClaimStatus" }
+        }
+      },
+      "FraudAlertClaim": {
+        "type": "object",
+        "required": ["claim_id", "claim_type", "fraud_score", "triggered_rules"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "claim_type": { "$ref": "#/components/schemas/ClaimType" },
+          "fraud_score": { "type": "integer" },
+          "triggered_rules": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "FraudAlertsResponse": {
+        "type": "object",
+        "required": ["claims"],
+        "properties": { "claims": { "type": "array", "items": { "$ref": "#/components/schemas/FraudAlertClaim" } } }
+      },
+      "FraudBreakdownEntry": {
+        "type": "object",
+        "required": ["rule_name", "weight"],
+        "properties": {
+          "rule_name": { "type": "string" },
+          "weight": { "type": "integer" }
+        }
+      },
+      "FraudScreeningSummary": {
+        "type": "object",
+        "required": ["score", "threshold", "flagged", "breakdown"],
+        "properties": {
+          "score": { "type": "integer" },
+          "threshold": { "type": "integer" },
+          "flagged": { "type": "boolean" },
+          "breakdown": { "type": "array", "items": { "$ref": "#/components/schemas/FraudBreakdownEntry" } }
+        }
+      },
+      "AssessmentSummary": {
+        "type": "object",
+        "required": ["claim_amount", "sum_insured", "deductible", "co_pay", "payable_amount"],
+        "properties": {
+          "claim_amount": { "$ref": "#/components/schemas/Decimal" },
+          "sum_insured": { "$ref": "#/components/schemas/Decimal" },
+          "deductible": { "$ref": "#/components/schemas/Decimal" },
+          "co_pay": { "$ref": "#/components/schemas/Decimal" },
+          "payable_amount": { "$ref": "#/components/schemas/Decimal" }
+        }
+      },
+      "WorkbenchResponse": {
+        "type": "object",
+        "required": ["claim_id", "claim_type", "status", "fraud_screening", "assessment", "suggested_reason_code"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "claim_type": { "$ref": "#/components/schemas/ClaimType" },
+          "status": { "$ref": "#/components/schemas/ClaimStatus" },
+          "fraud_screening": { "$ref": "#/components/schemas/FraudScreeningSummary" },
+          "assessment": { "$ref": "#/components/schemas/AssessmentSummary" },
+          "suggested_reason_code": { "$ref": "#/components/schemas/ReasonCode" }
+        }
+      },
+      "DecisionRequest": {
+        "type": "object",
+        "required": ["outcome", "reason_code"],
+        "properties": {
+          "outcome": { "$ref": "#/components/schemas/DecisionOutcome" },
+          "reason_code": { "$ref": "#/components/schemas/ReasonCode" }
+        }
+      },
+      "DecisionSubmitResponse": {
+        "type": "object",
+        "required": ["claim_id", "decision", "claim_status"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "decision": { "$ref": "#/components/schemas/DecisionSummary" },
+          "claim_status": { "$ref": "#/components/schemas/ClaimStatus" }
+        }
+      },
+      "AdminClaimRow": {
+        "type": "object",
+        "required": ["claim_id", "claim_type", "status", "claim_amount", "updated_at"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "claim_type": { "$ref": "#/components/schemas/ClaimType" },
+          "status": { "$ref": "#/components/schemas/ClaimStatus" },
+          "claim_amount": { "$ref": "#/components/schemas/Decimal" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AdminClaimsResponse": {
+        "type": "object",
+        "required": ["claims"],
+        "properties": { "claims": { "type": "array", "items": { "$ref": "#/components/schemas/AdminClaimRow" } } }
+      },
+      "PayoutRow": {
+        "type": "object",
+        "required": ["settlement_id", "claim_id", "payout_amount", "payment_reference", "created_at"],
+        "properties": {
+          "settlement_id": { "type": "integer" },
+          "claim_id": { "type": "integer" },
+          "payout_amount": { "$ref": "#/components/schemas/Decimal" },
+          "payment_reference": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PayoutsResponse": {
+        "type": "object",
+        "required": ["payouts"],
+        "properties": { "payouts": { "type": "array", "items": { "$ref": "#/components/schemas/PayoutRow" } } }
+      },
+      "OverrideRequest": {
+        "type": "object",
+        "required": ["command", "reason_code"],
+        "properties": {
+          "command": { "$ref": "#/components/schemas/AdminOverrideCommand" },
+          "reason_code": { "type": "string", "minLength": 1 }
+        }
+      },
+      "OverrideResponse": {
+        "type": "object",
+        "required": ["claim_id", "override_id", "claim_status"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "override_id": { "type": "integer" },
+          "claim_status": { "$ref": "#/components/schemas/ClaimStatus" }
+        }
+      },
+      "OverrideRow": {
+        "type": "object",
+        "required": ["override_id", "admin_actor_id", "command", "reason_code", "created_at"],
+        "properties": {
+          "override_id": { "type": "integer" },
+          "admin_actor_id": { "type": "string" },
+          "command": { "$ref": "#/components/schemas/AdminOverrideCommand" },
+          "reason_code": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "OverridesListResponse": {
+        "type": "object",
+        "required": ["overrides"],
+        "properties": { "overrides": { "type": "array", "items": { "$ref": "#/components/schemas/OverrideRow" } } }
+      },
+      "RetryResponse": {
+        "type": "object",
+        "required": ["claim_id", "claim_status"],
+        "properties": {
+          "claim_id": { "type": "integer" },
+          "claim_status": { "$ref": "#/components/schemas/ClaimStatus" }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized401": {
+        "description": "Missing or invalid X-Role header",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Forbidden403": {
+        "description": "Valid role but insufficient permission for this route",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "NotFound404": {
+        "description": "Referenced entity does not exist",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Conflict409": {
+        "description": "Domain conflict: duplicate claim or invalid state transition",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "Unprocessable422": {
+        "description": "Domain validation failure",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Liveness/readiness probe",
+        "tags": ["health"],
+        "responses": {
+          "200": {
+            "description": "Service is up",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/claims": {
+      "post": {
+        "operationId": "submitFnol",
+        "summary": "Submit a First Notice of Loss (FNOL)",
+        "tags": ["claims"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FnolRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Claim created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FnolResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" },
+          "409": { "$ref": "#/components/responses/Conflict409" },
+          "422": { "$ref": "#/components/responses/Unprocessable422" }
+        }
+      }
+    },
+    "/api/claims/{id}": {
+      "get": {
+        "operationId": "getClaim",
+        "summary": "Claim tracker read model",
+        "tags": ["claims"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Claim detail",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ClaimDetailResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" }
+        }
+      }
+    },
+    "/api/claims/{id}/reopen": {
+      "post": {
+        "operationId": "reopenClaim",
+        "summary": "Dispute a SETTLED claim, creating a linked sub-claim",
+        "tags": ["claims"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sub-claim created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReopenResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" },
+          "409": { "$ref": "#/components/responses/Conflict409" }
+        }
+      }
+    },
+    "/api/claims/documents/pending": {
+      "get": {
+        "operationId": "listPendingDocuments",
+        "summary": "Queue of claims in DOCS_PENDING with outstanding checklist items",
+        "tags": ["documents"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "name": "claim_type", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/ClaimType" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending-documents queue",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PendingDocsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" }
+        }
+      }
+    },
+    "/api/claims/{id}/documents/{type}": {
+      "patch": {
+        "operationId": "updateDocumentStatus",
+        "summary": "Toggle a checklist document's verification status",
+        "tags": ["documents"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" },
+          { "name": "type", "in": "path", "required": true, "schema": { "$ref": "#/components/schemas/DocumentType" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentPatchRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Document status updated",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentPatchResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" },
+          "422": { "$ref": "#/components/responses/Unprocessable422" }
+        }
+      }
+    },
+    "/api/claims/fraud-alerts": {
+      "get": {
+        "operationId": "listFraudAlerts",
+        "summary": "Queue of claims currently flagged by fraud screening",
+        "tags": ["workbench"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fraud alert queue",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FraudAlertsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" }
+        }
+      }
+    },
+    "/api/claims/{id}/workbench": {
+      "get": {
+        "operationId": "getWorkbenchDetail",
+        "summary": "Assessor workbench detail for a claim",
+        "tags": ["workbench"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workbench detail",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WorkbenchResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" }
+        }
+      }
+    },
+    "/api/claims/{id}/decision": {
+      "post": {
+        "operationId": "submitDecision",
+        "summary": "Assessor submits a manual decision on a MANUAL_REVIEW claim",
+        "tags": ["workbench"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DecisionRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision recorded",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DecisionSubmitResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" },
+          "409": { "$ref": "#/components/responses/Conflict409" },
+          "422": { "$ref": "#/components/responses/Unprocessable422" }
+        }
+      }
+    },
+    "/api/admin/claims": {
+      "get": {
+        "operationId": "listAdminClaims",
+        "summary": "Claim queue filtered by status/product",
+        "tags": ["admin"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "name": "status", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/ClaimStatus" } },
+          { "name": "product", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/ClaimType" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered claim queue",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminClaimsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" }
+        }
+      }
+    },
+    "/api/admin/payouts": {
+      "get": {
+        "operationId": "listPayouts",
+        "summary": "Immutable payout audit trail",
+        "tags": ["admin"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payout audit trail, reverse-chronological",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PayoutsResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" }
+        }
+      }
+    },
+    "/api/admin/claims/{id}/override": {
+      "post": {
+        "operationId": "overrideClaim",
+        "summary": "Force a claim decision/status with a mandatory reason code",
+        "tags": ["admin"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OverrideRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Override applied",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OverrideResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" },
+          "409": { "$ref": "#/components/responses/Conflict409" },
+          "422": { "$ref": "#/components/responses/Unprocessable422" }
+        }
+      }
+    },
+    "/api/admin/claims/{id}/overrides": {
+      "get": {
+        "operationId": "listClaimOverrides",
+        "summary": "Per-claim override audit history",
+        "tags": ["admin"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Override history, ascending by created_at",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OverridesListResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" }
+        }
+      }
+    },
+    "/api/admin/claims/{id}/retry": {
+      "post": {
+        "operationId": "retryClaimPipeline",
+        "summary": "Resume a claim stuck in PROCESSING_FAILED",
+        "tags": ["admin"],
+        "parameters": [
+          { "$ref": "#/components/parameters/XRole" },
+          { "$ref": "#/components/parameters/XActorId" },
+          { "$ref": "#/components/parameters/ClaimIdPath" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pipeline resumed",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RetryResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized401" },
+          "403": { "$ref": "#/components/responses/Forbidden403" },
+          "404": { "$ref": "#/components/responses/NotFound404" },
+          "409": { "$ref": "#/components/responses/Conflict409" }
+        }
+      }
+    }
+  }
+}

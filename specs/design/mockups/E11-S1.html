@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<!--
+  Story: E11-S1 — Build the document verification queue UI
+  Epic: E11 — Internal Portal
+  Depends on: E9-S2 (GET /api/claims/documents/pending,
+              PATCH /api/claims/{id}/documents/{type})
+
+  RECONCILED against specs/design/api-contracts.md (confirmed present).
+  GET /api/claims/documents/pending response: { claims: [ { claim_id
+  (integer), claim_type, outstanding_documents: [document_type,...] } ] }.
+  Query param is `claim_type` (optional).
+
+  SCHEMA NOTE: the contract does NOT return policy_number on this endpoint
+  (an earlier pass, before api-contracts.md existed, included a Policy
+  number column — removed now for fidelity). PATCH request body is
+  { verification_status: "VERIFIED" }; response includes claim_status
+  reflecting the claim's status after the update.
+
+  Self-contained: no CDN, no network calls. Role switcher (X-Role header
+  stub) demonstrates the ASSESSOR-only access boundary (AC3). Toggling the
+  last outstanding item for a claim and clicking "Refresh queue" removes
+  it from the list (AC2), simulating the PATCH + re-GET.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaimFlow Ops — Document Verification Queue</title>
+<style>
+  :root{
+    --navy-950:#0a121f; --navy-900:#0f1b30; --navy-800:#182842;
+    --amber-500:#e8a33d; --amber-400:#f0b85c; --amber-050:#fbecd3;
+    --slate-100:#f5f7fa; --slate-200:#eaeef3; --slate-300:#c7d0dc; --slate-500:#8391a6; --slate-700:#4b5670;
+    --green-600:#2f8f5b; --green-050:#e4f4ea;
+    --red-600:#c14a4f; --red-050:#fbe9ea;
+    --font-display:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+    --font-body:'Segoe UI',Tahoma,Geneva,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--slate-100);color:var(--navy-950);font-family:var(--font-body);}
+  header.top{background:var(--navy-950);color:var(--slate-100);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--amber-500);}
+  header.top .brand{font-family:var(--font-display);font-size:20px;letter-spacing:.06em;}
+  header.top .brand span{color:var(--amber-400);}
+  header.top nav{display:flex;gap:18px;font-size:12.5px;letter-spacing:.04em;}
+  header.top nav a{color:var(--slate-300);text-decoration:none;}
+  header.top nav a.current{color:#fff;border-bottom:2px solid var(--amber-500);padding-bottom:3px;}
+  .role-switch{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--slate-300);}
+  .role-switch select{background:var(--navy-800);color:#fff;border:1px solid var(--slate-500);border-radius:4px;padding:5px 8px;font-family:var(--font-body);font-size:12px;}
+  main{max-width:1100px;margin:0 auto;padding:26px 24px 80px;}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:var(--slate-700);font-weight:600;}
+  h1{font-family:var(--font-display);font-size:26px;margin:4px 0 4px;}
+  .api-tag{display:inline-block;font-family:monospace;font-size:11px;background:var(--navy-950);color:var(--amber-400);padding:2px 8px;border-radius:3px;margin-left:8px;}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:18px 0 16px;}
+  .filters{display:flex;gap:8px;}
+  .filters button{border:1.5px solid #cdd5e0;background:#fff;padding:7px 14px;border-radius:20px;font-size:12.5px;cursor:pointer;color:var(--navy-800);}
+  .filters button.active{background:var(--navy-950);color:#fff;border-color:var(--navy-950);}
+  .filters .hint{font-size:11px;color:var(--slate-500);align-self:center;}
+  button.refresh{background:var(--amber-500);border:none;color:var(--navy-950);font-weight:700;padding:9px 18px;border-radius:4px;font-size:13px;cursor:pointer;}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e1e6ee;border-radius:6px;overflow:hidden;}
+  thead th{background:var(--navy-950);color:var(--slate-300);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:12px 14px;font-weight:600;}
+  tbody td{padding:14px;border-bottom:1px solid var(--slate-200);font-size:14px;vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:var(--amber-050);color:#8a5a12;}
+  .doc-chip{display:inline-flex;align-items:center;gap:8px;background:var(--slate-100);border:1px solid var(--slate-300);border-radius:20px;padding:4px 10px 4px 12px;margin:3px 6px 3px 0;font-size:12.5px;}
+  .doc-chip.verified{background:var(--green-050);border-color:var(--green-600);color:#1d5c3c;}
+  .doc-chip code{font-size:10px;color:var(--slate-500);}
+  .doc-chip.verified code{color:#1d5c3c;}
+  .mini-switch{position:relative;width:30px;height:16px;flex:none;}
+  .mini-switch input{opacity:0;width:0;height:0;}
+  .mini-slider{position:absolute;inset:0;background:#d7dde5;border-radius:16px;cursor:pointer;transition:.15s;}
+  .mini-slider::before{content:'';position:absolute;height:12px;width:12px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.15s;}
+  .mini-switch input:checked + .mini-slider{background:var(--green-600);}
+  .mini-switch input:checked + .mini-slider::before{transform:translateX(14px);}
+  .empty-state, .denied-state{background:#fff;border:1px dashed var(--slate-500);border-radius:6px;padding:48px 26px;text-align:center;color:var(--slate-700);}
+  .denied-state{border-color:var(--red-600);}
+  .denied-state h2{font-family:var(--font-display);color:var(--red-600);margin-top:0;}
+  @media (max-width:600px){
+    table, thead, tbody, th, td, tr{display:block;}
+    thead{display:none;}
+    tbody tr{margin-bottom:14px;border:1px solid var(--slate-200);border-radius:6px;}
+    tbody td{border-bottom:none;padding:8px 14px;}
+    tbody td:first-child{padding-top:14px;}
+    tbody td::before{content:attr(data-label);display:block;font-size:10px;text-transform:uppercase;color:var(--slate-500);font-weight:700;margin-bottom:3px;}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <div class="brand">Claim<span>Flow</span> Ops</div>
+  </div>
+  <nav>
+    <a href="E11-S1.html" class="current">Document Queue</a>
+    <a href="E11-S2.html">Fraud Alerts</a>
+    <a href="E11-S3.html">Workbench</a>
+    <a href="E11-S4.html">Admin</a>
+  </nav>
+  <div class="role-switch">
+    <label for="role-select">X-Role</label>
+    <select id="role-select">
+      <option value="ASSESSOR" selected>ASSESSOR</option>
+      <option value="CUSTOMER">CUSTOMER</option>
+      <option value="ADMIN">ADMIN</option>
+    </select>
+  </div>
+</header>
+
+<main>
+  <div id="assessor-view">
+    <div class="eyebrow">Internal Portal</div>
+    <h1>Document verification queue <span class="api-tag">GET /api/claims/documents/pending?claim_type=</span></h1>
+
+    <div class="toolbar">
+      <div class="filters">
+        <button class="active" data-filter="ALL">All types</button>
+        <button data-filter="MOTOR">Motor</button>
+        <button data-filter="HEALTH">Health</button>
+        <button data-filter="LIFE">Life</button>
+        <span class="hint">(?claim_type=)</span>
+      </div>
+      <button class="refresh" id="refresh-btn">Refresh queue</button>
+    </div>
+
+    <table id="queue-table">
+      <thead>
+        <tr><th>claim_id</th><th>claim_type</th><th>outstanding_documents</th></tr>
+      </thead>
+      <tbody id="queue-body">
+        <tr data-claim="4231" data-type="MOTOR">
+          <td data-label="claim_id">4231 <div class="pill">DOCS_PENDING</div></td>
+          <td data-label="claim_type">MOTOR</td>
+          <td data-label="outstanding_documents">
+            <span class="doc-chip verified">Repair invoice <code>INVOICE</code></span>
+            <span class="doc-chip" data-doc="POLICE_FIR">
+              Police FIR <code>POLICE_FIR</code>
+              <label class="mini-switch"><input type="checkbox" class="doc-toggle"><span class="mini-slider"></span></label>
+            </span>
+          </td>
+        </tr>
+        <tr data-claim="4390" data-type="HEALTH">
+          <td data-label="claim_id">4390 <div class="pill">DOCS_PENDING</div></td>
+          <td data-label="claim_type">HEALTH</td>
+          <td data-label="outstanding_documents">
+            <span class="doc-chip" data-doc="HOSPITAL_BILL">
+              Hospital bill <code>HOSPITAL_BILL</code>
+              <label class="mini-switch"><input type="checkbox" class="doc-toggle"><span class="mini-slider"></span></label>
+            </span>
+            <span class="doc-chip" data-doc="DISCHARGE_SUMMARY">
+              Discharge summary <code>DISCHARGE_SUMMARY</code>
+              <label class="mini-switch"><input type="checkbox" class="doc-toggle"><span class="mini-slider"></span></label>
+            </span>
+          </td>
+        </tr>
+        <tr data-claim="4455" data-type="MOTOR">
+          <td data-label="claim_id">4455 <div class="pill">DOCS_PENDING</div></td>
+          <td data-label="claim_type">MOTOR</td>
+          <td data-label="outstanding_documents">
+            <span class="doc-chip" data-doc="POLICE_FIR">
+              Police FIR <code>POLICE_FIR</code>
+              <label class="mini-switch"><input type="checkbox" class="doc-toggle"><span class="mini-slider"></span></label>
+            </span>
+            <span class="doc-chip" data-doc="INVOICE">
+              Repair invoice <code>INVOICE</code>
+              <label class="mini-switch"><input type="checkbox" class="doc-toggle"><span class="mini-slider"></span></label>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="empty-state" id="empty-state" style="display:none;margin-top:16px;">
+      No claims currently in DOCS_PENDING for this filter.
+    </div>
+    <p style="font-size:12px;color:var(--slate-500);margin-top:10px;">Toggling a document to Verified calls <code>PATCH /api/claims/{id}/documents/{type}</code> with body <code>{"verification_status":"VERIFIED"}</code>. Click "Refresh queue" to re-run the GET — a claim with all items verified drops off the list.</p>
+  </div>
+
+  <div class="denied-state" id="denied-view" style="display:none;">
+    <h2>403 — FORBIDDEN</h2>
+    <p>The document verification queue is only available to the ASSESSOR (or ADMIN) role. Your current role is <strong id="denied-role">CUSTOMER</strong>.</p>
+  </div>
+</main>
+
+<script>
+(function(){
+  var roleSelect = document.getElementById('role-select');
+  var assessorView = document.getElementById('assessor-view');
+  var deniedView = document.getElementById('denied-view');
+
+  function applyRole(){
+    var role = roleSelect.value;
+    if(role === 'ASSESSOR' || role === 'ADMIN'){
+      assessorView.style.display = 'block';
+      deniedView.style.display = 'none';
+    } else {
+      assessorView.style.display = 'none';
+      deniedView.style.display = 'block';
+      document.getElementById('denied-role').textContent = role;
+    }
+  }
+  roleSelect.addEventListener('change', applyRole);
+  applyRole();
+
+  var filterButtons = document.querySelectorAll('.filters button');
+  var rows = document.querySelectorAll('#queue-body tr');
+  filterButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      filterButtons.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      var f = btn.dataset.filter;
+      var visibleCount = 0;
+      rows.forEach(function(r){
+        var show = (f === 'ALL' || r.dataset.type === f) && r.dataset.removed !== 'true';
+        r.style.display = show ? '' : 'none';
+        if(show) visibleCount++;
+      });
+      document.getElementById('empty-state').style.display = visibleCount === 0 ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('refresh-btn').addEventListener('click', function(){
+    rows.forEach(function(r){
+      var toggles = r.querySelectorAll('.doc-toggle');
+      var allVerified = Array.from(toggles).every(function(t){ return t.checked; });
+      if(toggles.length > 0 && allVerified){
+        r.dataset.removed = 'true';
+        r.style.display = 'none';
+      }
+    });
+    var activeFilter = document.querySelector('.filters button.active').dataset.filter;
+    var visible = Array.from(rows).filter(function(r){
+      return r.dataset.removed !== 'true' && (activeFilter === 'ALL' || r.dataset.type === activeFilter);
+    });
+    document.getElementById('empty-state').style.display = visible.length === 0 ? 'block' : 'none';
+  });
+
+  document.querySelectorAll('.doc-toggle').forEach(function(t){
+    t.addEventListener('change', function(){
+      var chip = t.closest('.doc-chip');
+      chip.classList.toggle('verified', t.checked);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://claimflow.local/schemas/data-models.schema.json",
+  "title": "ClaimFlow Data Models",
+  "description": "JSON Schema (draft-07) for every persisted entity and supporting non-persisted type in ClaimFlow. Companion to specs/design/data-models.md.",
+  "definitions": {
+    "Decimal": {
+      "type": "string",
+      "description": "Fixed-point decimal amount serialized as a string, e.g. \"35000.00\". Never a JSON number/float (NFR-01).",
+      "pattern": "^-?[0-9]+(\\.[0-9]{1,2})?$"
+    },
+    "DateOnly": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "Timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "Role": {
+      "type": "string",
+      "enum": ["CUSTOMER", "ASSESSOR", "ADMIN"]
+    },
+    "ClaimType": {
+      "type": "string",
+      "enum": ["MOTOR", "HEALTH", "LIFE"]
+    },
+    "PolicyStatus": {
+      "type": "string",
+      "enum": ["ACTIVE", "LAPSED", "EXPIRED", "CANCELLED"]
+    },
+    "ClaimStatus": {
+      "type": "string",
+      "enum": [
+        "INTAKE",
+        "DOCS_PENDING",
+        "FRAUD_SCREENING",
+        "ASSESSMENT",
+        "AUTO_APPROVED",
+        "MANUAL_REVIEW",
+        "REJECTED",
+        "SETTLED",
+        "REOPENED",
+        "PROCESSING_FAILED"
+      ]
+    },
+    "DocumentType": {
+      "type": "string",
+      "enum": ["POLICE_FIR", "INVOICE", "HOSPITAL_BILL", "DISCHARGE_SUMMARY", "DEATH_CERTIFICATE"]
+    },
+    "VerificationStatus": {
+      "type": "string",
+      "enum": ["VERIFIED", "MISSING"]
+    },
+    "DecisionOutcome": {
+      "type": "string",
+      "enum": ["AUTO_APPROVE", "MANUAL_REVIEW", "REJECT"]
+    },
+    "ReasonCode": {
+      "type": "string",
+      "enum": [
+        "POLICY_INACTIVE",
+        "ZERO_PAYABLE_AMOUNT",
+        "FRAUD_FLAG",
+        "AUTO_APPROVED_LOW_RISK",
+        "HIGH_VALUE_REVIEW",
+        "DOCS_INCOMPLETE"
+      ]
+    },
+    "ApiErrorCode": {
+      "type": "string",
+      "enum": [
+        "POLICY_INACTIVE",
+        "DUPLICATE_CLAIM",
+        "INVALID_STATE_TRANSITION",
+        "VALIDATION_ERROR",
+        "UNKNOWN_CLAIM_TYPE",
+        "UNAUTHORIZED",
+        "FORBIDDEN",
+        "NOT_FOUND",
+        "PROCESSING_FAILED"
+      ]
+    },
+    "AdminOverrideCommand": {
+      "type": "string",
+      "enum": ["FORCE_APPROVE", "FORCE_REJECT", "FORCE_MANUAL_REVIEW", "FORCE_RETRY"]
+    },
+    "ClaimStateTransitionEvent": {
+      "type": "string",
+      "enum": [
+        "ATTACH_CHECKLIST",
+        "DOCS_VERIFIED",
+        "FRAUD_CLEARED",
+        "FRAUD_FLAGGED",
+        "PIPELINE_ERROR",
+        "DECISION_AUTO_APPROVE",
+        "DECISION_MANUAL_REVIEW",
+        "DECISION_REJECT",
+        "ASSESSOR_APPROVE",
+        "ASSESSOR_REJECT",
+        "ADMIN_FORCE_APPROVE",
+        "ADMIN_FORCE_REJECT",
+        "ADMIN_FORCE_MANUAL_REVIEW",
+        "SETTLE",
+        "REOPEN",
+        "RETRY_TO_DOCS_PENDING",
+        "RETRY_TO_FRAUD_SCREENING",
+        "RETRY_TO_ASSESSMENT"
+      ]
+    },
+    "Policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "policy_number", "product_type", "status", "sum_insured", "effective_date", "expiry_date", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "policy_number": {"type": "string", "minLength": 1},
+        "product_type": {"$ref": "#/definitions/ClaimType"},
+        "status": {"$ref": "#/definitions/PolicyStatus"},
+        "sum_insured": {"$ref": "#/definitions/Decimal"},
+        "effective_date": {"$ref": "#/definitions/DateOnly"},
+        "expiry_date": {"$ref": "#/definitions/DateOnly"},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "Claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "policy_id", "claim_type", "incident_date", "claim_amount", "status", "parent_claim_id", "created_at", "updated_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "policy_id": {"type": "integer", "minimum": 1},
+        "claim_type": {"$ref": "#/definitions/ClaimType"},
+        "incident_date": {"$ref": "#/definitions/DateOnly"},
+        "claim_amount": {"$ref": "#/definitions/Decimal"},
+        "status": {"$ref": "#/definitions/ClaimStatus"},
+        "parent_claim_id": {"type": ["integer", "null"], "minimum": 1},
+        "created_at": {"$ref": "#/definitions/Timestamp"},
+        "updated_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "ClaimDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "document_type", "verification_status", "created_at", "updated_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "document_type": {"$ref": "#/definitions/DocumentType"},
+        "verification_status": {"$ref": "#/definitions/VerificationStatus"},
+        "created_at": {"$ref": "#/definitions/Timestamp"},
+        "updated_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "FraudRuleBreakdownEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_name", "weight"],
+      "properties": {
+        "rule_name": {
+          "type": "string",
+          "enum": ["HIGH_CLAIM_TO_SUM_RATIO", "EARLY_FILING", "CLAIM_FREQUENCY", "MOTOR_MISSING_FIR", "ROUND_NUMBER_CLAIM"]
+        },
+        "weight": {"type": "integer", "minimum": 0}
+      }
+    },
+    "FraudScreening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "score", "breakdown", "threshold", "flagged", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "score": {"type": "integer", "minimum": 0},
+        "breakdown": {"type": "array", "items": {"$ref": "#/definitions/FraudRuleBreakdownEntry"}},
+        "threshold": {"type": "integer", "minimum": 0},
+        "flagged": {"type": "boolean"},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "Assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "claim_amount", "sum_insured", "deductible", "co_pay", "payable_amount", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "claim_amount": {"$ref": "#/definitions/Decimal"},
+        "sum_insured": {"$ref": "#/definitions/Decimal"},
+        "deductible": {"$ref": "#/definitions/Decimal"},
+        "co_pay": {"$ref": "#/definitions/Decimal"},
+        "payable_amount": {"$ref": "#/definitions/Decimal"},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "Decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "outcome", "reason_code", "decided_by", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "outcome": {"$ref": "#/definitions/DecisionOutcome"},
+        "reason_code": {"$ref": "#/definitions/ReasonCode"},
+        "decided_by": {"type": "string", "minLength": 1},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "Settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "decision_id", "payout_amount", "payment_reference", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "decision_id": {"type": "integer", "minimum": 1},
+        "payout_amount": {"$ref": "#/definitions/Decimal"},
+        "payment_reference": {"type": "string", "minLength": 1},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "ClaimStateTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "from_state", "to_state", "event", "actor_id", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "from_state": {"$ref": "#/definitions/ClaimStatus"},
+        "to_state": {"$ref": "#/definitions/ClaimStatus"},
+        "event": {"$ref": "#/definitions/ClaimStateTransitionEvent"},
+        "actor_id": {"type": ["string", "null"]},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "AdminOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim_id", "admin_actor_id", "command", "reason_code", "created_at"],
+      "properties": {
+        "id": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": "integer", "minimum": 1},
+        "admin_actor_id": {"type": "string", "minLength": 1},
+        "command": {"$ref": "#/definitions/AdminOverrideCommand"},
+        "reason_code": {"type": "string", "minLength": 1},
+        "created_at": {"$ref": "#/definitions/Timestamp"}
+      }
+    },
+    "ActorContext": {
+      "type": "object",
+      "description": "Non-persisted request-scoped value object produced by the E8-S1 auth dependency.",
+      "additionalProperties": false,
+      "required": ["role", "actor_id"],
+      "properties": {
+        "role": {"$ref": "#/definitions/Role"},
+        "actor_id": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "Policy": {"$ref": "#/definitions/Policy"},
+    "Claim": {"$ref": "#/definitions/Claim"},
+    "ClaimDocument": {"$ref": "#/definitions/ClaimDocument"},
+    "FraudScreening": {"$ref": "#/definitions/FraudScreening"},
+    "Assessment": {"$ref": "#/definitions/Assessment"},
+    "Decision": {"$ref": "#/definitions/Decision"},
+    "Settlement": {"$ref": "#/definitions/Settlement"},
+    "ClaimStateTransition": {"$ref": "#/definitions/ClaimStateTransition"},
+    "AdminOverride": {"$ref": "#/definitions/AdminOverride"},
+    "ActorContext": {"$ref": "#/definitions/ActorContext"}
+  }
+}
