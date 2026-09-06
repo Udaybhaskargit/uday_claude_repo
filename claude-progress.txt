@@ -30,3 +30,35 @@ learned_rules: 0
 blocked_stories: none
 notes: features.json consolidated to repo root (spec/SKILL.md corrected from specs/features.json)
 next_action: Human review of specs/stories/dependency-graph.md and epic/story decomposition, then /design
+
+=== Session 1 (cont.) ===
+spec: approved
+design: complete, pending human review — system-design.md, api-contracts, data-models, folder-structure,
+  component-map, deployment.md, 7 mockups + index. One bug found+fixed in-flight: E11-S2/S3/S4 mockups
+  used invented fraud rule names not matching data-models.md's closed enum; corrected to CLAIM_FREQUENCY
+  and ROUND_NUMBER_CLAIM.
+git: remote https://github.com/Udaybhaskargit/uday_claude_repo.git; PR #1 (chore/scaffold-harness -> main)
+  merged — harness substrate + BRD + spec + design now on main. Zero direct commits to main.
+next_action: Human review of specs/design/, then /build
+
+=== Session 2 ===
+date: 2026-09-06T00:00:00Z
+mode: full
+design: approved (specs/design/ — system-design.md, api-contracts, data-models, component-map,
+  deployment.md, mockups). Approved by user in main conversation; confirmed by coordinator.
+groups_completed: []
+groups_remaining: [A, B, C, D, E, F, G, H, I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: none
+features_passing: 0 / 130
+coverage: 0%
+learned_rules: 0
+blocked_stories: none
+notes: Phase 4 state init finalized — coverage-baseline.txt reset to 0 (was mistakenly holding the
+  80% threshold value from project-manifest.json); iteration-log.md and learned-rules.md headers
+  already present from prior session. Per capstone PR-only-merge rule, this state update rides on
+  a branch + PR (chore/phase4-state-init) rather than a direct commit to main; per-group
+  implementation work in /auto will likewise land via feature-branch + PR, not direct commits.
+next_action: Run /auto --mode full to begin Group A (E1-S1, E1-S2, E1-S3 — domain types layer)
