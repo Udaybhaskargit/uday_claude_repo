@@ -439,3 +439,32 @@ class TestCountRecentClaims:
         count = repo.count_recent_claims(policy_id, before_date="2026-03-10", window_days=90)
 
         assert count == 0
+
+
+class TestGetLastTransition:
+    """Group H (E6-S3) addition: supplies claim_pipeline_service.retry_pipeline()
+    with the state a claim was in when it failed."""
+
+    def test_returns_none_when_no_transitions_recorded(
+        self, conn: sqlite3.Connection, policy_id: int
+    ) -> None:
+        claim_id = _insert_claim_row(conn, policy_id=policy_id)
+        repo = ClaimRepository(conn)
+
+        assert repo.get_last_transition(claim_id) is None
+
+    def test_returns_the_most_recently_inserted_transition(
+        self, conn: sqlite3.Connection, policy_id: int
+    ) -> None:
+        claim_id = _insert_claim_row(conn, policy_id=policy_id, status=ClaimStatus.INTAKE.value)
+        repo = ClaimRepository(conn)
+        repo.apply_transition(claim_id, ClaimEvent.ATTACH_CHECKLIST)
+        repo.apply_transition(claim_id, ClaimEvent.DOCS_VERIFIED)
+
+        last = repo.get_last_transition(claim_id)
+
+        assert last is not None
+        assert last.from_state == ClaimStatus.DOCS_PENDING
+        assert last.to_state == ClaimStatus.FRAUD_SCREENING
+        assert last.event == ClaimEvent.DOCS_VERIFIED.value
+        assert last.claim_id == claim_id

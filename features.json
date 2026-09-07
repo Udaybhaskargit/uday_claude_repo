@@ -1162,8 +1162,8 @@
       "Action: Run_pipeline() is invoked.",
       "Assert: It ends in exactly one terminal state among AUTO_APPROVED, MANUAL_REVIEW, REJECTED, with a matching Decision row."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1178,8 +1178,8 @@
       "Action: Run_pipeline() is invoked.",
       "Assert: It halts at DOCS_PENDING and does not call the fraud or assessment services."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1194,8 +1194,8 @@
       "Action: Caught by the orchestrator.",
       "Assert: The claim transitions to PROCESSING_FAILED and the error is logged as structured JSON with no PII fields, per NFR-06."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1210,8 +1210,8 @@
       "Action: An admin calls retry_pipeline().",
       "Assert: The pipeline re-runs starting from the failed step."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1594,8 +1594,8 @@
       "Action: GET /api/claims/fraud-alerts is called.",
       "Assert: The response lists only claims whose latest FraudScreening.flagged is True."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1610,8 +1610,8 @@
       "Action: GET /api/claims/{id}/workbench is called.",
       "Assert: The response includes the fraud score and breakdown, the assessed payable_amount, and decision-rationale fields."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1626,8 +1626,8 @@
       "Action: POST /api/claims/{id}/decision is called with an assessor's outcome and reason code.",
       "Assert: The response is 200 and a new append-only Decision row is created with decided_by set to the assessor's actor id."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },

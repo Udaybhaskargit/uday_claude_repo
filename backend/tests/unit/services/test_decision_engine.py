@@ -15,12 +15,17 @@ from src.repositories.assessment_repository import AssessmentRepository
 from src.repositories.claim_repository import ClaimRepository
 from src.repositories.decision_repository import DecisionRepository
 from src.repositories.fraud_screening_repository import FraudScreeningRepository
-from src.services.decision_engine import DecisionComputation, decide, run_decision
+from src.services.decision_engine import (
+    DecisionComputation,
+    decide,
+    run_decision,
+    submit_assessor_decision,
+)
 from src.services.document_checklist_service import check_documents_complete, verify_document
 from src.services.fnol_intake_service import submit_fnol
 from src.services.fraud_screening_service import run_fraud_screening
 from src.types.enums import ClaimStatus, ClaimType, DecisionOutcome, DocumentType, ReasonCode
-from src.types.exceptions import InvalidClaimStateException
+from src.types.exceptions import InvalidClaimStateException, ValidationError
 
 REAL_MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations"
 
@@ -86,6 +91,26 @@ def _claim_in_assessment(
     claim_after = ClaimRepository(conn).get_by_id(claim.id)
     assert claim_after is not None
     assert claim_after.status == ClaimStatus.ASSESSMENT
+    return claim.id
+
+
+def _claim_in_manual_review(conn: sqlite3.Connection, *, policy_number: str) -> int:
+    """A fraud-flagged motor claim, landed directly in MANUAL_REVIEW."""
+    _insert_policy(conn, policy_number=policy_number, sum_insured="500000.00")
+    claim = submit_fnol(
+        conn,
+        policy_number=policy_number,
+        claim_type=ClaimType.MOTOR,
+        incident_date="2026-03-10",
+        claim_amount=Decimal("35000.00"),
+    )
+    verify_document(conn, claim.id, DocumentType.POLICE_FIR)
+    verify_document(conn, claim.id, DocumentType.INVOICE)
+    assert check_documents_complete(conn, claim.id) is True
+    run_fraud_screening(conn, claim.id, FraudRulesConfig(rules=(), threshold=0))
+    claim_after = ClaimRepository(conn).get_by_id(claim.id)
+    assert claim_after is not None
+    assert claim_after.status == ClaimStatus.MANUAL_REVIEW
     return claim.id
 
 
@@ -279,3 +304,78 @@ class TestUnknownClaimId:
     def test_raises_lookup_error(self, conn: sqlite3.Connection) -> None:
         with pytest.raises(LookupError):
             run_decision(conn, 999999, _MOTOR_RULES)
+
+
+class TestSubmitAssessorDecision:
+    """Group H (E9-S3) addition, backing the POST /api/claims/{id}/decision route."""
+
+    def test_auto_approve_outcome_persists_decision_and_moves_claim(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        claim_id = _claim_in_manual_review(conn, policy_number="POL-WB-1")
+
+        decision = submit_assessor_decision(
+            conn, claim_id, DecisionOutcome.AUTO_APPROVE, ReasonCode.AUTO_APPROVED_LOW_RISK,
+            "assessor-9",
+        )
+
+        assert decision.outcome == DecisionOutcome.AUTO_APPROVE
+        assert decision.decided_by == "assessor-9"
+        claim = ClaimRepository(conn).get_by_id(claim_id)
+        assert claim is not None
+        assert claim.status == ClaimStatus.AUTO_APPROVED
+
+    def test_reject_outcome_persists_decision_and_moves_claim(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        claim_id = _claim_in_manual_review(conn, policy_number="POL-WB-2")
+
+        decision = submit_assessor_decision(
+            conn, claim_id, DecisionOutcome.REJECT, ReasonCode.FRAUD_FLAG, "assessor-9"
+        )
+
+        assert decision.outcome == DecisionOutcome.REJECT
+        claim = ClaimRepository(conn).get_by_id(claim_id)
+        assert claim is not None
+        assert claim.status == ClaimStatus.REJECTED
+
+    def test_manual_review_outcome_has_no_usable_event_and_raises_validation_error(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        claim_id = _claim_in_manual_review(conn, policy_number="POL-WB-3")
+
+        with pytest.raises(ValidationError):
+            submit_assessor_decision(
+                conn, claim_id, DecisionOutcome.MANUAL_REVIEW, ReasonCode.HIGH_VALUE_REVIEW,
+                "assessor-9",
+            )
+
+        # No Decision row inserted, and the claim untouched.
+        assert DecisionRepository(conn).get_latest(claim_id) is None
+        claim = ClaimRepository(conn).get_by_id(claim_id)
+        assert claim is not None
+        assert claim.status == ClaimStatus.MANUAL_REVIEW
+
+    def test_raises_invalid_state_when_claim_not_in_manual_review(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        claim_id = _claim_in_assessment(
+            conn,
+            claim_amount=Decimal("35000.00"),
+            sum_insured="500000.00",
+            policy_number="POL-WB-4",
+            fraud_config=_NEVER_FLAG_CONFIG,
+        )
+
+        with pytest.raises(InvalidClaimStateException):
+            submit_assessor_decision(
+                conn, claim_id, DecisionOutcome.AUTO_APPROVE, ReasonCode.AUTO_APPROVED_LOW_RISK,
+                "assessor-9",
+            )
+
+    def test_raises_lookup_error_for_unknown_claim(self, conn: sqlite3.Connection) -> None:
+        with pytest.raises(LookupError):
+            submit_assessor_decision(
+                conn, 999999, DecisionOutcome.AUTO_APPROVE, ReasonCode.AUTO_APPROVED_LOW_RISK,
+                "assessor-9",
+            )
