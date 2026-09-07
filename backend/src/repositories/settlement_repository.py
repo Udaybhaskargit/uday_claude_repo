@@ -2,8 +2,17 @@
 
 Data access for the append-only, immutable `settlements` table
 (data-models.md sec 2.7). Immutability is structural here: this module
-exposes only `insert()` and `list_all()` -- no `update()`/`delete()` method
-exists anywhere in this class, per E3-S4 AC2 / E7-S1 AC2.
+exposes only `insert()`, `list_all()`, and `get_latest_for_claim()` -- no
+`update()`/`delete()` method exists anywhere in this class, per E3-S4 AC2 /
+E7-S1 AC2 (`backend/tests/architecture/test_audit_repositories_insert_only.py`
+enforces this via reflection on the live class).
+
+`get_latest_for_claim()` was added in Group I (E7-S1) so
+`settlement_service.settle()` can return the freshly-inserted row re-read
+from the DB rather than constructing it from in-memory values, matching the
+same "re-query, don't just trust local state" pattern already used by
+`DecisionRepository.get_latest()` and `AssessmentRepository.
+get_latest_assessment()`.
 """
 
 from __future__ import annotations
@@ -38,6 +47,35 @@ class SettlementRepository:
         new_id = cursor.lastrowid
         assert new_id is not None
         return new_id
+
+    def get_latest_for_claim(self, claim_id: int) -> Settlement | None:
+        """Return the most recently inserted settlement for `claim_id`.
+
+        Ordered by `created_at DESC, id DESC` so the highest `id` breaks any
+        timestamp ties caused by SQLite's second-level `created_at`
+        granularity, matching the same tie-break convention used by
+        `DecisionRepository.get_latest()` / `AssessmentRepository.
+        get_latest_assessment()`. Returns `None` if `claim_id` has no
+        settlement yet.
+        """
+        row = self._connection.execute(
+            "SELECT id, claim_id, decision_id, payout_amount, payment_reference, "
+            "created_at FROM settlements WHERE claim_id = ? "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            (claim_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        return Settlement(
+            id=row["id"],
+            claim_id=row["claim_id"],
+            decision_id=row["decision_id"],
+            payout_amount=Decimal(row["payout_amount"]),
+            payment_reference=row["payment_reference"],
+            created_at=row["created_at"],
+        )
 
     def list_all(self) -> list[Settlement]:
         """Return every settlement row, oldest first (audit trail listing)."""

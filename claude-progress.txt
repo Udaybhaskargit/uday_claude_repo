@@ -360,3 +360,64 @@ notes: Group H backend-only stories landed -- E6-S3 (pipeline orchestrator) and 
 next_action: Independently re-verify Group H (E6-S3, E9-S3), merge its PR, then run /auto --mode
   full to begin E11-S1 (document verification queue UI, now unblocked by the frontend scaffold) and
   Group I (E7-S1 settlement service, E11-S2 fraud alert queue UI).
+
+=== Session 12 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C, D, E, F, G, H]
+groups_remaining: [I (this session), J, K] -- E11-S1 (Group H's deferred UI story) still open
+current_group: I
+current_stories: [E7-S1, E9-S1, E11-S2]
+sprint_contract: none
+last_commit: pending (this session's own commit, not yet made at time of writing)
+features_passing: 109 / 130 (98 going in + 11 this session: F077-F080, F093-F096, F121-F123)
+coverage: 100% (backend, 1356/1356 stmts)
+learned_rules: 0
+blocked_stories: none
+notes: Implemented Group I directly (fork with no subagent-spawning available, same constraint as
+  Groups F/G/H self-checks) -- E7-S1 settlement_service.py (settle(): gates AUTO_APPROVED -> SETTLED
+  via the E1-S2 SETTLE event *before* any Settlement row is written, so a REJECTED/MANUAL_REVIEW
+  claim's apply_transition() call raises InvalidClaimStateException with zero settlement side
+  effects; stub payment reference is a uuid4-based string, no network/payment-rail import anywhere
+  in the module, confirmed both by test and by construction). Added SettlementRepository.
+  get_latest_for_claim() (additive; the existing insert-only structural test uses a subset check,
+  not exact-set, so this doesn't trip it). E9-S1 claims_router.py: POST /api/claims, GET
+  /api/claims/{id}, POST /api/claims/{id}/reopen, thin adapters over the already-built
+  fnol_intake_service/reopen_service. This finally exercises F047/F050 at the real HTTP layer --
+  the gap flagged after Group F (PolicyNotActiveException/DuplicateClaimException reaching
+  error_handlers.py was previously unverifiable because no route called submit_fnol()) -- both now
+  covered by real TestClient integration tests. Hit and fixed a real route-ordering bug: mounting
+  claims_router before documents_router/workbench_router made Starlette match the dynamic
+  `/api/claims/{claim_id}` segment against literal siblings like `/api/claims/fraud-alerts` first
+  (path-shape matching happens before int-conversion), producing a spurious 422 instead of ever
+  trying the literal routes -- fixed by mounting claims_router last in main.py, with the reasoning
+  recorded inline as a comment so a future added route doesn't reintroduce it. E11-S2 FraudQueuePage
+  needed nothing new from the backend (GET /api/claims/fraud-alerts already shipped in Group H)
+  -- pure frontend consumption. Found and fixed a real, disclosed UX/testability gap while building
+  it: AuthContext's actor was in-memory-only (useState with no persistence), so a hard page
+  navigation (`page.goto()`, or a real user hitting refresh) silently dropped the selected role and
+  RoleGuard would show Access Denied even for a role that was already picked -- added sessionStorage
+  persistence (tab-scoped, try/catch-guarded for private-browsing contexts) as a small, additive fix
+  to shared auth infra rather than routing every e2e test through client-side-only navigation.
+  Gates: backend 338 tests / 100% coverage (1356/1356 stmts) / ruff clean / mypy clean (50 files);
+  frontend typecheck clean / lint 0 errors (2 non-blocking react-refresh warnings, same class already
+  accepted for this file in the Group I frontend-scaffold review) / vitest 3 passed / build clean /
+  Playwright 3 passed (this sandboxed environment hit ERR_INSUFFICIENT_RESOURCES under Playwright's
+  default 3-parallel-workers setting -- not a real bug, confirmed by rerunning the identical suite
+  with `--workers=1` and getting a clean pass; worth noting for CI config later, non-blocking here).
+  IMPORTANT PROCESS NOTE for future sessions: this fork's Bash tool session intermittently resets its
+  persisted cwd back to an isolated `.claude/worktrees/agent-*` directory (created for this fork,
+  disconnected from the real repo -- confirmed stale, still at the Group H commit, missing every file
+  this session wrote) rather than keeping the `cd` into the real repo from earlier in the same turn --
+  this happened silently after a session-rate-limit interruption/resume mid-task, and produced two
+  misleading gate results (a stale-looking "47 mypy files" instead of 50, and a worktree-path-prefixed
+  eslint warning) before being caught by explicitly re-anchoring every subsequent command with
+  `cd "/d/Personal_working/capstone/<dir>"` and re-running every gate from scratch. Do not trust a
+  gate result after a resume/interruption without first confirming `pwd` resolves to the real repo,
+  not a worktree.
+  Only 4 stories remain fully unstarted: E11-S1 (Group H's deferred document-verification-queue UI,
+  unblocked since the frontend scaffold landed), and all of Group J (E10-S1, E11-S3) and Group K
+  (E10-S3) -- the remaining customer-facing FNOL form, workbench UI, and dispute-flow UI.
+next_action: Independent evaluator re-verification of this PR (no subagent was available to do it
+  in-session, matching the disclosed gap from Groups F/G/H), then merge, then run /auto --mode full
+  to pick up E11-S1 and Group J/K to close out the remaining 21 features.
