@@ -487,3 +487,70 @@ notes: Implemented Group I directly (fork with no subagent-spawning available, s
 next_action: Independent evaluator re-verification of this PR (no subagent was available to do it
   in-session, matching the disclosed gap from Groups F/G/H), then merge, then run /auto --mode full
   to pick up E11-S1 and Group J/K to close out the remaining 21 features.
+
+=== Session 14 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C, D, E, F, G, H, I, J, K]
+groups_remaining: []
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: (pending -- see PR opened this session)
+features_passing: 130 / 130
+coverage: backend 100% (1358/1358 stmts); frontend 25/25 vitest unit tests, 24/24 Playwright e2e
+learned_rules: 0
+blocked_stories: none
+notes: MILESTONE -- all 130 features passing. Implemented Group J (E10-S1 FNOL form, E10-S2 claim
+  tracker, E11-S3 assessor workbench) and Group K (E10-S3 dispute flow) directly in this session
+  (resumed as a fork after a session-rate-limit interruption; executed inline rather than via
+  further subagent spawning per fork rules). E10-S2 was still outstanding despite being tagged
+  group J in features.json and not previously flagged as done -- confirmed via features.json itself
+  before starting, not assumed from a prior session's notes.
+  New: frontend/src/api/claimsApi.ts (POST /api/claims, GET /api/claims/{id}, POST
+  /api/claims/{id}/reopen), workbenchApi.ts (GET .../workbench, POST .../decision),
+  constants/documentChecklists.ts (the per-claim-type checklist UI needs to compute
+  verified-vs-outstanding client-side, since the API only returns the outstanding subset via
+  missing_documents -- mirrors backend/src/services/fnol_intake_service.py's CHECKLISTS exactly,
+  including LIFE being DEATH_CERTIFICATE only, not the mockup's speculative +ID_PROOF). Replaced
+  the CustomerFnolPage/CustomerTrackerPage/WorkbenchPage placeholders with real implementations.
+  CustomerTrackerPage hosts both E10-S2 (read-only tracker) and E10-S3 (dispute action) since the
+  Dispute button only ever appears on a claim's own tracker view.
+  Design decision on E11-S3 AC2 ("removed from the pending workbench list"): no dedicated
+  "workbench queue" endpoint exists (GET /api/claims/{id}/workbench is single-claim, keyed by
+  route param) -- interpreted as removing the decision form from this claim's own view after a
+  successful submit (replaced by a confirmation panel), not a separate list endpoint. Disclosed in
+  a code comment; worth confirming with the actual mockup/PM intent if this project continues.
+  Real bug found via e2e (not caught by mocked vitest tests): submit_assessor_decision() rejects
+  DecisionOutcome.MANUAL_REVIEW with a 422 (no ASSESSOR_* state-machine event exists for it -- only
+  AUTO_APPROVE/REJECT are assessor-submittable, per the pre-existing Group H code's own docstring).
+  My first Playwright/vitest tests for F125 exercised MANUAL_REVIEW as the "successful" case and
+  only caught this because the e2e run hit the real backend; the mocked unit test would have stayed
+  green forever with the wrong outcome. Fixed both to use AUTO_APPROVE. This is the general reason
+  this project runs Playwright against a live backend rather than trusting mocked tests alone.
+  Extended backend/scripts/seed_e2e_db.py with 5 new fixtures (ACTIVE unclaimed policy for FNOL;
+  a partially-verified DOCS_PENDING claim; a decided-but-unsettled MANUAL_REVIEW claim; a SETTLED
+  claim dedicated to the dispute-flow mutation, kept separate from the E11-S4 admin fixture so
+  reopening it can't race that spec's read-only assertions; a MANUAL_REVIEW claim with real
+  FraudScreening + Assessment rows for the workbench). This surfaced two real test-fragility bugs in
+  already-merged specs, both fixed: documentQueue.spec.ts's AC1/AC2 asserted `getByText("MOTOR",
+  {exact:true})` was singular, which broke (strict-mode violation) once a second MOTOR/DOCS_PENDING
+  fixture existed -- rescoped to claim id 1 specifically; adminDashboard.spec.ts's AC3/AC4 asserted
+  a singular `tr` containing "MANUAL_REVIEW", which broke once two more MANUAL_REVIEW fixtures
+  existed -- rescoped to the unique claim_amount "90000.00". Neither was a regression in those
+  stories' own logic, only in test-locator specificity; both were caught by re-running the full e2e
+  suite after adding new fixtures, not assumed safe.
+  Gates (all self-verified in this session -- no independent evaluator subagent available, same
+  disclosed gap as Groups F/G/H/I; recommend one before merging, consistent with every prior group):
+  backend `pytest -x -q` 341 passed, `pytest --cov` 100% (1358/1358 stmts), `ruff check .` clean,
+  `mypy src/` clean (50 files); frontend `npm run typecheck`/`npm run lint` (0 errors, 3 pre-existing
+  warnings)/`npm run build` all clean, `npm test` 25/25 vitest passed, `npx playwright test` 24/24
+  passed against a live seeded backend (full suite, not just the new specs -- confirms no
+  regressions in Groups D/E/F/G/H/I's e2e coverage either).
+next_action: Independent evaluator re-verification of this PR, then merge -- this closes out the
+  full 130/130 feature build. After merge, the natural next steps for this project (not required by
+  the capstone's 130-feature scope) would be: a full /review pass (security-reviewer + evaluator)
+  across the whole codebase, retry_pipeline()'s admin-triggered HTTP endpoint (POST
+  /api/admin/claims/{id}/retry, referenced in api-contracts.md as an extension but never built),
+  and closing the small disclosed nits logged across the evaluator reports (decide()'s untested
+  flagged+above-ceiling combination, F122's coverage gap, etc.).

@@ -1706,8 +1706,8 @@
       "Action: Rendered.",
       "Assert: All fields remain reachable without horizontal scrolling."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1722,8 +1722,8 @@
       "Action: The checklist section renders.",
       "Assert: It shows exactly Hospital bill and Discharge summary toggles, not motor or life document labels."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1738,8 +1738,8 @@
       "Action: Submit is clicked.",
       "Assert: An inline validation message appears and no API call is made."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1754,8 +1754,8 @@
       "Action: The API returns 201.",
       "Assert: The UI navigates to the claim tracker view for the new claim id."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1770,8 +1770,8 @@
       "Action: The tracker renders.",
       "Assert: It lists each outstanding document type distinctly from verified ones."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1786,8 +1786,8 @@
       "Action: Rendered.",
       "Assert: The human-readable reason text, not just the raw code, is displayed."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1802,8 +1802,8 @@
       "Action: Rendered.",
       "Assert: The settled payout amount is displayed and a Dispute this claim action is visible."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1818,8 +1818,8 @@
       "Action: Rendered.",
       "Assert: No dispute action is shown."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1834,8 +1834,8 @@
       "Action: Clicked.",
       "Assert: A confirmation dialog appears before any API call is made."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1850,8 +1850,8 @@
       "Action: The reopen API call succeeds.",
       "Assert: The UI shows the new sub-claim id and a link to its tracker."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1866,8 +1866,8 @@
       "Action: The error returns.",
       "Assert: A user-facing error message is shown and the original claim's displayed status is unchanged."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1978,8 +1978,8 @@
       "Action: The workbench renders.",
       "Assert: It displays the fraud score and breakdown alongside the computed payable_amount."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1994,8 +1994,8 @@
       "Action: The API call succeeds.",
       "Assert: The UI shows a confirmation and the claim is removed from the pending workbench list."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -2010,8 +2010,8 @@
       "Action: Submit is clicked.",
       "Assert: A validation message blocks the call."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T11:03:02.937Z",
     "failure_reason": null,
     "failure_layer": null
   },

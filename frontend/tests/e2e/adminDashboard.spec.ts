@@ -51,7 +51,10 @@ test("AC2: the payout audit trail is read-only", async ({ page }) => {
 test("AC3: submitting an override without a reason code is blocked", async ({ page }) => {
   await loginAsAdmin(page);
 
-  const reviewRow = page.locator("tr", { hasText: "MANUAL_REVIEW" });
+  // Scoped by claim_amount (unique to this fixture), not just "MANUAL_REVIEW"
+  // -- other e2e specs' fixtures also seed MANUAL_REVIEW claims into the
+  // same shared DB, which would otherwise make this a strict-mode violation.
+  const reviewRow = page.locator("tr", { hasText: "90000.00" });
   await expect(reviewRow).toBeVisible();
   await reviewRow.getByRole("button", { name: /select for override/i }).click();
   await page.getByRole("button", { name: /submit override/i }).click();
@@ -62,7 +65,10 @@ test("AC3: submitting an override without a reason code is blocked", async ({ pa
 test("AC4: a successful override appears in the claim's audit history", async ({ page }) => {
   await loginAsAdmin(page);
 
-  const reviewRow = page.locator("tr", { hasText: "MANUAL_REVIEW" });
+  // Scoped by claim_amount (unique to this fixture), not just "MANUAL_REVIEW"
+  // -- other e2e specs' fixtures also seed MANUAL_REVIEW claims into the
+  // same shared DB, which would otherwise make this a strict-mode violation.
+  const reviewRow = page.locator("tr", { hasText: "90000.00" });
   await expect(reviewRow).toBeVisible();
   await reviewRow.getByRole("button", { name: /select for override/i }).click();
   await page.getByLabel(/command/i).selectOption("FORCE_APPROVE");
