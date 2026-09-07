@@ -730,3 +730,72 @@ Grepped for every call site of `submit_fnol()` and `get_connection()` in `backen
 - `backend/tests/integration/api/test_admin_router.py`
 - `backend/src/api/error_handlers.py` (mutation-tested — swapped `POLICY_INACTIVE`/`DUPLICATE_CLAIM` mapping entries, confirmed 0 of 261 tests catch it, reverted via `git checkout`, confirmed clean)
 - `features.json` (F044-F050, F051-F054, F059-F062, F103-F106 — 19 features — currently marked `passes: true`; F047 and F050 specifically should be treated as unverified pending the fix recommended above)
+
+## Group G (partial — backend only: E6-S2, E9-S2)
+
+**Branch:** `group-g/decision-and-documents-api` (see commit landed alongside this report entry), opened as a PR, not yet merged.
+
+**IMPORTANT — verification mode for this entry: this is a GENERATOR SELF-CHECK, not an independent evaluator pass.** The session that wrote this code ran under a coordinator's fork with a hard constraint against spawning further subagents, so no separate evaluator agent reviewed this group before this entry was written — the same gap Group F's report flagged and the coordinator had to close after the fact. This entry should be treated with correspondingly lower confidence than the Group D/E/F sections above, which were all written by an agent that did not write the code it reviewed. **Recommend an independent evaluator pass on this branch before merging**, same as was done for Group F.
+
+### What was run (self-reported, not independently reproduced by a second agent)
+
+```
+cd backend && uv run pytest -x -q            # 283 passed
+uv run pytest --cov=src --cov-report=term-missing -q   # 283 passed, 100% coverage (1052/1052 stmts)
+uv run ruff check .                          # All checks passed!
+uv run mypy src/                             # Success: no issues found in 43 source files
+```
+
+### E6-S2 — decision engine (F068-F072)
+
+`backend/src/services/decision_engine.py` (new). A pure `decide(payable_amount, flagged, auto_approve_ceiling) -> DecisionComputation` function plus a `run_decision(conn, claim_id, assessment_config, decided_by="system")` persistence+gating entrypoint.
+
+- **F068** (payable_amount == 0 -> REJECT/ZERO_PAYABLE_AMOUNT): tested both at the pure-function level and end-to-end (motor claim with `claim_amount` set equal to the 5000 deductible, so `payable_amount` computes to exactly 0; confirms the persisted `Decision.outcome`/`reason_code` and the claim's transition to `REJECTED`).
+- **F069** (flagged + nonzero -> MANUAL_REVIEW/FRAUD_FLAG): tested at the pure-function level directly. The end-to-end version required a deliberate test-design workaround, disclosed in both the test file and `claude-progress.txt`: `fraud_screening_service` already gates a *first* flagged screening straight to `MANUAL_REVIEW`, never `ASSESSMENT`, so a claim can only carry `flagged=True` while sitting in `ASSESSMENT` via a *later* re-screening. The integration test simulates this by inserting a second `FraudScreening` row directly via the repository rather than through a real retry flow (Group H's `retry_pipeline()` doesn't exist yet). This is a legitimate simulation of a real future code path, not a fabricated scenario, but it has not been independently checked against `specs/stories/E6-S2.md`'s exact intent by a second reader.
+- **F070/F071** (unflagged, at-or-below vs. above the 50000 ceiling -> AUTO_APPROVE/AUTO_APPROVED_LOW_RISK vs. MANUAL_REVIEW/HIGH_VALUE_REVIEW): tested both at the pure-function level (including the boundary value, exactly at the ceiling) and end-to-end, with the end-to-end AUTO_APPROVE case additionally asserting the persisted `Assessment.payable_amount` value.
+- **F072** (append-only Decision row, `decided_by` recorded correctly): tested with both the default `"system"` value and an explicit assessor actor id string, plus a reflection check (`DecisionRepository` exposes no `update`/`delete`, mirroring the Group D pattern) and one additional self-added test (double-decision on an already-decided claim raises `InvalidClaimStateException` via `apply_transition()`, proving no silent double-apply) — this last test goes beyond the literal AC text but follows the same "no silent double-apply" pattern Group E's admin-override AC4 established.
+
+Precedence rule implemented: zero payable amount always rejects regardless of `flagged` (AC1 has no `flagged` input in its own statement, so it must win outright); a nonzero flagged claim always goes to manual review regardless of the ceiling (AC2 has no ceiling comparison in its own statement); only once both are ruled out does the ceiling decide AC3 vs. AC4. This precedence was inferred from reading all four ACs together, not stated explicitly in the story — worth a second reader's confirmation.
+
+`run_decision()` also does something E6-S1 itself never did: it's the first code path in the whole codebase to call `AssessmentRepository.insert()`. Disclosed tradeoff in the docstring: the `Assessment` row is inserted before the `apply_transition()` gate check, so a claim that's already left `ASSESSMENT` (e.g. a double-call) will still get an extra `Assessment` row inserted even though the subsequent transition (and `Decision` insert) correctly fails — matching the same cross-call-atomicity tradeoff already disclosed in `fnol_intake_service` and `reopen_service` in prior groups' reports.
+
+### E9-S2 — document verification API (F097-F099)
+
+`backend/src/api/routers/documents_router.py` + `backend/src/api/schemas/documents_schemas.py` (both new), plus one addition to the existing `document_checklist_service.py`: `list_outstanding_documents(conn, claim_id) -> list[DocumentType]`.
+
+- **F097** (`GET /api/claims/documents/pending` lists only DOCS_PENDING claims with outstanding items): tested with a positive case (fresh motor claim, confirms both `POLICE_FIR`/`INVOICE` listed as outstanding) and a negative case (a `SETTLED` claim inserted directly is confirmed absent from the response).
+- **F098** (`PATCH .../documents/{type}` reflects the update; auto-advances to `FRAUD_SCREENING` once complete): tested end-to-end verifying one document at a time, confirming `claim_status` stays `DOCS_PENDING` after the first and flips to `FRAUD_SCREENING` after the second, then confirms the claim disappears from the pending-queue response afterward. Two additional error-path tests: an out-of-checklist document type (422/`VALIDATION_ERROR`, reusing E5-S1's existing `verify_document()` validation) and an unknown claim id (404/`NOT_FOUND`).
+- **F099** (`CUSTOMER` role -> 403 on both routes): one test hits both endpoints with `X-Role: CUSTOMER` and asserts 403/`FORBIDDEN` on both, following the exact `test_admin_router.py` F106 pattern (`response.json()["detail"]["error"]["code"]`, since `require_role()`'s 403 is a raw `HTTPException`, not a `DomainException` routed through `error_handlers.py`).
+
+Disclosed scope limitation, not a defect: the PATCH endpoint only accepts `"VERIFIED"` as a request value and rejects anything else (including `"MISSING"`) with `ValidationError`/422, because no `ClaimDocumentRepository` method exists to flip a row back to `MISSING` — inventing one wasn't requested by any AC in E5-S1 or E9-S2, so none was added. A test confirms this rejection explicitly (also closes what would otherwise have been a 1-line coverage gap in `documents_router.py`).
+
+Both routes require `ASSESSOR` or `ADMIN` per `specs/design/api-contracts.md`'s "Document Verification API" section (not just `ASSESSOR` alone) — matches the design doc, not an invented requirement.
+
+### What was NOT independently checked (gaps versus the Group D/E/F review process)
+
+- No second agent re-ran the gates from a fresh checkout.
+- No mutation testing was performed against `decide()`'s precedence logic or `check_documents_complete()`'s reuse in the pending-queue path (Group F's evaluator mutation-tested the underlying `check_documents_complete()` itself; this session did not repeat that, relying on Group F's prior result since the function itself is unmodified).
+- The precedence-ordering inference for `decide()` (described above) has not been cross-checked by a second reader against `specs/stories/E6-S2.md` or BRD section 11 beyond this session's own reading.
+- `features.json` was updated directly by this same session (F068-F072, F097-F099 set to `passes: true`) rather than by a separate evaluator, same caveat as Group F's F047/F050 situation but applying to all 8 features in this entry, not just 2.
+
+## Gate re-run results — Group G (self-reported)
+
+| Gate | Command | Result |
+|---|---|---|
+| pytest | `uv run pytest -x -q` | 283 passed |
+| pytest + coverage | `uv run pytest --cov=src --cov-report=term-missing -q` | 283 passed, 100% coverage (1052/1052 stmts) |
+| ruff | `uv run ruff check .` | All checks passed |
+| mypy | `uv run mypy src/` | Success: no issues found in 43 source files |
+
+## Files touched — Group G
+
+- `backend/src/services/decision_engine.py` (new)
+- `backend/src/api/routers/documents_router.py` (new)
+- `backend/src/api/schemas/documents_schemas.py` (new)
+- `backend/src/services/document_checklist_service.py` (added `list_outstanding_documents()`)
+- `backend/src/main.py` (mounted `documents_router`, updated module docstring)
+- `backend/tests/unit/services/test_decision_engine.py` (new)
+- `backend/tests/integration/api/test_documents_router.py` (new)
+- `backend/tests/unit/services/test_document_checklist_service.py` (added `list_outstanding_documents` coverage)
+- `features.json` (F068-F072, F097-F099 — 8 features — set to `passes: true` by this same session; recommend independent re-verification before treating as trustworthy as prior groups')
+- `claude-progress.txt` (Session 9 entry appended)
