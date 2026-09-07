@@ -443,3 +443,137 @@ No wildly divergent patterns found; the three agents' modules are stylistically 
 - `backend/tests/architecture/test_audit_repositories_insert_only.py` (independently mutation-tested by temporarily adding `def update(self): pass` to `DecisionRepository`, confirming failure, then reverting via `git checkout` and confirming a clean pass again)
 - `git show --stat` for `d06d378`, `199edf6`, `f58dd2c` (confirmed zero file overlap between the three generator commits: 3+7+4=14 files, matching the full-range diff)
 - `features.json` (F028-F039, 12 features, updated to `passes: true` following this evaluation — verified via `git diff` that exactly and only these 12 entries changed)
+
+## Group E — Service Layer (E4-S1, E5-S2, E6-S1, E7-S2, E8-S2)
+
+**Branch:** `group-e/core-services`, five sequential commits on top of Group D:
+- `f555167` — E4-S1 FNOL intake service
+- `261468b` — E6-S1 assessment service
+- `27abf00` — E7-S2 reopen/dispute service
+- `fcb2382` — E8-S2 admin override service
+- `b6f1d5e` — E5-S2 deterministic fraud scoring engine
+
+**Verification mode for this group:** N/A — pure Python service layer over the Group D repositories, no Docker/API/UI surface. Verified by direct pytest/ruff/mypy execution against `backend/.venv`.
+
+### Verdict: **PASS** (all five stories)
+
+All three layers of the ratchet gate (independent re-run of every AC, static gates, architecture/structural gates, plus the specific duplicate-detection edge case flagged in the Group D report) pass. No blocking defects found.
+
+---
+
+## What was independently re-run
+
+```
+cd backend && uv run pytest -x -q
+```
+Result: **219 passed**, 1 warning (an unrelated upstream `anyio`/`starlette` deprecation notice, not project code).
+
+```
+uv run pytest --cov=src --cov-report=term-missing -q
+```
+Result: **219 passed**, coverage **100%** across the full `src/` tree (762/762 statements), including all five new modules: `src/services/fnol_intake_service.py` (25/25), `src/services/fraud_scoring_engine.py` (51/51), `src/services/assessment_service.py` (27/27), `src/services/reopen_service.py` (15/15), `src/services/admin_override_service.py` (26/26).
+
+```
+uv run ruff check .
+```
+Result: **All checks passed!**
+
+```
+uv run mypy src/
+```
+Result: **Success: no issues found in 32 source files.**
+
+---
+
+## Check-by-check findings
+
+### 1. Architecture — one-way import rule (Service layer)
+
+Grepped every `from`/`import` line in all 5 files in `backend/src/services/`: the only non-stdlib imports are `src.config.fraud_rules_config`, `src.config.assessment_rules_config`, `src.repositories.claim_document_repository`, `src.repositories.claim_repository`, `src.repositories.admin_override_repository`, `src.types.enums`, `src.types.exceptions`, `src.types.models`. Zero occurrences of `src.api`, `src.db`, `src.ui`, or one service importing another service module. This matches `.claude/architecture.md`'s Service-layer rule (may import Types, Config, Repository; never API or UI) exactly.
+
+### 2. E4-S1 — FNOL intake service (F040-F043): PASS
+
+Traced each AC to a real, DB-requerying test in `test_fnol_intake_service.py`:
+- **AC1/F040** (motor -> POLICE_FIR + INVOICE, both MISSING) — `test_motor_fnol_creates_claim_and_checklist` re-queries `ClaimDocumentRepository.list_by_claim()` after the call and asserts the exact 2-element document-type set plus `VerificationStatus.MISSING` on both. Genuine.
+- **AC2/F041** (health -> HOSPITAL_BILL + DISCHARGE_SUMMARY) and **AC3/F042** (life -> DEATH_CERTIFICATE, exactly one row) — same pattern, both confirmed.
+- **AC4/F043** (INTAKE -> DOCS_PENDING) — `test_claim_starts_intake_and_ends_docs_pending` re-fetches the claim via `ClaimRepository.get_by_id()` (not trusting `submit_fnol()`'s return value alone) and additionally queries `claim_state_transitions` directly, asserting exactly one row with `from_state=INTAKE`, `to_state=DOCS_PENDING`, `event=ATTACH_CHECKLIST`. Strong.
+- A defensive `UnknownClaimTypeError` test confirms no claim row is created at all for an out-of-domain `claim_type`, via a direct `SELECT COUNT(*)` check.
+
+Read `submit_fnol()` itself (`fnol_intake_service.py:54-98`): checklist lookup happens *before* `ClaimRepository.create()` is called, so an unrecognized claim type genuinely creates zero rows rather than creating-then-failing. Confirmed **no reference to `exists_duplicate()`** anywhere in this file — `specs/design/component-map.md` line 21 places duplicate-detection (E4-S3) in Group F, not this story's scope, so this is correctly out of scope here, not a missing check.
+
+### 3. E5-S2 — deterministic fraud scoring engine (F055-F058): PASS
+
+- **AC1/F055** (ratio 0.85 alone -> 40, not flagged) and **AC2/F056** (ratio 0.85 + 2-day filing -> 65, flagged) — `test_high_ratio_alone_scores_40_and_is_not_flagged` and `test_high_ratio_and_early_filing_scores_65_and_is_flagged` assert exact `total_score`, exact ordered `breakdown` list contents (not just length), and the `flagged` boolean. Both use the **real shipped** `backend/config/fraud-rules.json` via `load_fraud_rules_config`, not a synthetic config — so a regression to the shipped weights/threshold would break these tests, not just an isolated fixture.
+- **AC3/F057** (determinism) — `test_scoring_the_same_input_twice_produces_identical_results` asserts `first_result == second_result` (full tuple equality: score + breakdown) **and** `first_result[1] is not second_result[1]` — this second assertion is the correct check that the engine returns a fresh list each call rather than a shared mutable object aliased across calls, which is a stronger determinism guarantee than value-equality alone.
+- **AC4/F058** (motor missing FIR -> +15 with rule name) — `test_motor_claim_missing_fir_includes_motor_missing_fir_in_breakdown` asserts the exact `FraudRuleBreakdownEntry(rule_name="MOTOR_MISSING_FIR", weight=15)` is present. Companion tests confirm the rule does NOT fire for a motor claim WITH a verified FIR, and does NOT fire for a non-motor claim missing FIR — both boundary directions covered, not just the positive case.
+- Read `score()` itself (`fraud_scoring_engine.py:122-141`): iterates `config.rules` (config-driven order, not a hardcoded rule list) and reads `rule.weight` from config on every triggered rule — confirmed no hardcoded weight literal anywhere in the scoring loop. `is_flagged()` uses `>=` against `config.threshold`; boundary tests (`score == threshold` flags, `threshold - 1` does not) confirm the `>=` semantic matches the AC1 worked example (40 < 60 not flagged) precisely.
+- Design note: this engine takes a purpose-built `FraudScoringInput` value object rather than reaching into repositories itself, keeping it a zero-I/O pure function (confirmed by grep: no `sqlite3`/`Connection`/repository import anywhere in this file). Gathering `recent_claim_count_90d`/`has_verified_police_fir` from the DB is correctly deferred to a not-yet-built caller (E5-S3, Group F per the module's own docstring) — consistent with `component-map.md` scoping this file to E5-S2 only.
+
+### 4. E6-S1 — assessment service (F063-F067): PASS
+
+- **AC1/F063** (motor, 40000/100000, deductible 5000, no co-pay -> 35000) and **AC2/F064** (health, 20000, deductible 1000 + 10% co-pay of the *post-deductible* 19000 = 1900 -> 17100) — both asserted exactly, and F064's test explicitly checks the co-pay is computed on `claim_amount - deductible`, not on `claim_amount` or `sum_insured`, matching the AC's worked example precisely (a common off-by-base bug this test would catch).
+- **AC3/F065** (life, 200000/150000 -> capped at 150000, no deductions) — confirmed `min(claim_amount, sum_insured)` is applied before deductible/co-pay, via a `ClaimTypeRules(deductible=0, co_pay_pct=0)` life config.
+- **AC4/F066** (clamp to 0, never negative) — two tests, one where `after_deductible` alone would already be negative before any co-pay is applied, confirming the clamp happens post-co-pay-computation rather than short-circuiting in a way that could still leak a negative intermediate value into the final result.
+- **AC5/F067** (Decimal only, no float) — `test_result_fields_are_all_decimal_instances` uses `isinstance` checks on all 5 result fields (not duck-typing), and `test_source_file_contains_no_float_usage` is a genuine static source-grep for `float(`, `: float`, `-> float` in the actual shipped module file (not the test file), confirmed by reading `assessment_service.py` myself: `Decimal(rules.deductible)` and `Decimal(rules.co_pay_pct)` explicitly convert the config's plain `int` fields through `Decimal(...)`, never through `float`. A `ROUND_HALF_UP` rounding test (`15% of 100.01 = 15.0015 -> 15.00`) confirms the rounding mode is deterministic and disclosed, not an unspecified/arbitrary choice.
+- Confirmed no persistence happens in this module (no repository import) — `assess()` returns a local `AssessmentComputation` value object, consistent with the module docstring's statement that mapping onto `AssessmentRepository.insert()` is a separate, later concern.
+
+### 5. E7-S2 — reopen/dispute service (F081-F084): PASS, including the flagged duplicate-detection edge case
+
+- **AC1/F081** (new Claim, `parent_claim_id` set, `status=INTAKE`) — `test_reopen_settled_claim_creates_intake_sub_claim` re-queries via `ClaimRepository.get_by_id()` on the *returned* sub-claim id (not trusting the return value alone), confirming `parent_claim_id`, `status`, `policy_id`, `claim_type`, `incident_date`, and `claim_amount` all match the original claim's fields, carried forward correctly.
+- **AC2/F082** (Decision/Settlement/Assessment rows unchanged) — `test_reopen_does_not_mutate_decision_settlement_assessment_rows` snapshots all three rows as full-row dicts before calling `reopen()`, then re-reads and asserts exact dict equality after. This is a genuine mutation check (would catch a partial-field edit), not a mere existence check.
+- **AC3/F083** (original -> REOPENED via the state-machine gate) — `test_reopen_transitions_original_to_reopened_via_gate` re-reads the original claim's status directly and additionally asserts exactly one `claim_state_transitions` row with `from_state=SETTLED`, `to_state=REOPENED`, `event=REOPEN`, and the correct `actor_id` — confirming the transition went through `ClaimRepository.apply_transition()` (which is the only code path that writes this audit table) rather than a direct column UPDATE.
+- **AC4/F084** (non-SETTLED claim raises `InvalidClaimStateException`) — `test_reopen_non_settled_claim_raises_and_creates_no_sub_claim` asserts both the exception type **and** that the `claims` table row count is unchanged (no orphan sub-claim created) **and** the original claim's status is still `MANUAL_REVIEW` post-exception.
+
+**Duplicate-detection edge case (explicitly checked per the task instruction):** Read `reopen_service.py` in full. `reopen()` calls exactly two repository methods: `ClaimRepository.get_by_id()` and `ClaimRepository.apply_transition()` (to move the original to REOPENED), followed by `ClaimRepository.create(..., parent_claim_id=claim_id)` for the sub-claim. Grepped `reopen_service.py` for `exists_duplicate` — **zero matches**. `ClaimRepository.create()` itself (`claim_repository.py:31-71`) is a plain `INSERT` with no duplicate check inside it either — `exists_duplicate()` is a separate, standalone query method that nothing in this file calls. Cross-checked against `specs/design/component-map.md` line 21: `exists_duplicate()` is wired up only by **E4-S3** (Group F, not yet built), which is the new-FNOL-submission path, structurally distinct from `reopen()`. **Conclusion: the risk flagged in the Group D report does not materialize. `reopen()` cannot trip the duplicate-claim check because it never calls `exists_duplicate()` at all — it creates the sub-claim via a direct, unconditional `ClaimRepository.create()` call.** This is confirmed by reading the code, not inferred from absence of a failing test. Whoever implements E4-S3 (Group F) still needs to independently confirm the FNOL-intake path's own duplicate check behaves correctly for first-time submissions; that remains out of this group's scope.
+
+### 6. E8-S2 — admin override service (F089-F092): PASS
+
+- **AC1/F089** (AdminOverride row inserted with actor/command/reason_code/timestamp) — `test_force_approve_inserts_row_and_moves_status` asserts both the returned `AdminOverride` object's fields **and** a direct `SELECT * FROM admin_overrides` re-query, plus confirms the claim's status actually moved (`AUTO_APPROVED`) via `ClaimRepository.get_by_id()`.
+- **AC2/F090** (missing/blank `reason_code` raises typed validation error, no row inserted) — parametrized over `""` and `"   "` (whitespace-only), confirming `_validate_reason_code()`'s `.strip()` check catches both. Asserts `_override_rows(conn) == []` (real empty-table check, not just "no exception with a truthy row count") and that the claim's status is unchanged.
+- **AC3/F091** (valid target uses the E1-S2 gate; invalid target raises) — two tests: a positive case confirming a `claim_state_transitions` row is written with the correct `event=ADMIN_FORCE_APPROVE`, and a negative case (`SETTLED` claim, which has no `ADMIN_FORCE_APPROVE` entry in the transition table) confirming `InvalidClaimStateException` propagates and **no** override row is inserted — the override audit row is correctly gated behind a successful transition, not inserted unconditionally.
+- **AC4/F092** (concurrent overrides, second fails against stale state) — `test_second_override_against_stale_state_raises` runs two `override()` calls back-to-back against the same claim: the first succeeds (`MANUAL_REVIEW` -> `AUTO_APPROVED`), the second uses a command that *was* valid for the original status but is not valid for the claim's *current* (post-first-call) status, and asserts it raises `InvalidClaimStateException`, that exactly one override row exists afterward (not two), and that the claim is still in the first call's resulting state (no partial/silent double-apply). This is a genuine sequential-request race simulation, not just a single-call negative test relabeled.
+- Read `override()` itself (`admin_override_service.py:85-130`): `_validate_reason_code()` runs before any repository call, so a validation failure genuinely can't reach the DB. The `AdminOverride` audit row is inserted only *after* `apply_transition()` returns successfully — confirmed by control flow, not inferred.
+- `FORCE_RETRY`'s three-way ambiguity (`RETRY_TO_DOCS_PENDING`/`RETRY_TO_FRAUD_SCREENING`/`RETRY_TO_ASSESSMENT`) is disclosed in the module docstring as an undocumented gap in the AC text, resolved by requiring an explicit `target_event` parameter, raising `ValidationError` if omitted — tested both ways (`test_force_retry_without_target_event_raises_validation_error`, `test_force_retry_with_explicit_target_event_succeeds`). Reasonable, disclosed design decision, not a defect.
+
+### 7. Append-only invariants
+
+None of the 5 service files execute raw SQL directly — confirmed by reading all 5 files in full: every DB interaction goes through a repository method (`ClaimRepository.create()`/`apply_transition()`/`get_by_id()`, `ClaimDocumentRepository.insert()`, `AdminOverrideRepository.insert()`/`list_admin_overrides()`). None of these service files call anything named `update`, `delete`, `edit`, or perform a raw `UPDATE`/`DELETE` statement. Combined with the Group D report's mutation-tested confirmation that the audit repositories (`FraudScreeningRepository`, `AssessmentRepository`, `DecisionRepository`, `SettlementRepository`, `AdminOverrideRepository`) structurally have no `update()`/`delete()` methods at all (`inspect.getmembers` reflection guard), the append-only invariant holds transitively: the Service layer has no code path capable of mutating a fraud screening, assessment, or admin override row in place, even if it wanted to. `ClaimRepository.apply_transition()` (called by `fnol_intake_service`, `reopen_service`, and `admin_override_service`) is the sole exception, and it is an explicitly documented, gated mutation path (the `claims.status` column), not an audit-table mutation.
+
+### 8. Decimal, never float
+
+- `assessment_service.py`: confirmed via `test_source_file_contains_no_float_usage` (re-verified by my own read of the file) — every money value flows through `Decimal(...)` construction and `.quantize(_CENTS, rounding=ROUND_HALF_UP)`; `_CENTS = Decimal("0.01")`.
+- `fraud_scoring_engine.py`: `claim_amount`/`sum_insured` in `FraudScoringInput` are typed `Decimal`; the ratio check (`_is_high_claim_to_sum_ratio_triggered`) and round-number check (`_is_round_number_claim_triggered`) both operate on `Decimal` division/modulo, never casting to `float`. Rule `weight`s are plain `int` (point values, not currency), which is correct — `data-models.md` sec 3.2 and the Group B evaluation both confirm weights/threshold are validated as JSON integers, not money fields, so `int` is the correct type here, not a Decimal-discipline violation.
+- `fnol_intake_service.py`: `claim_amount: Decimal` parameter, passed straight through to `ClaimRepository.create()` with no float conversion.
+- Grepped all 5 files for the literal substrings `float(` / `: float` / `-> float` myself (not just trusting the one test that checks this for `assessment_service.py`) — zero matches across the whole `services/` directory.
+
+### 9. No PII in logs
+
+Grepped all 5 service files for `logg`, `logger`, and `print(` — **zero matches** in any of the 5 files. None of these modules perform any logging at all; they only construct and return typed value objects or raise typed exceptions (whose messages carry structural identifiers like `claim_id`/`variable_name`, not claim narratives, health data, or document content — confirmed by reading every `raise` statement in all 5 files: messages reference claim IDs, reason codes, and event names, never any PII-bearing field). Since there is no logging call anywhere in this layer, there is no PII-in-logs risk to report for Group E.
+
+---
+
+## Gate re-run results
+
+| Gate | Command | Result |
+|---|---|---|
+| pytest | `pytest -x -q` | 219 passed |
+| pytest + coverage | `pytest --cov=src --cov-report=term-missing -q` | 219 passed, 100% coverage (762/762 stmts) |
+| ruff | `ruff check .` | All checks passed |
+| mypy | `mypy src/` | Success: no issues found in 32 source files |
+
+## Non-blocking observations (nits)
+
+1. `fnol_intake_service.submit_fnol()` and `reopen_service.reopen()` both document, in their own docstrings, that a mid-sequence failure (e.g. a DB error between `apply_transition()` and the following `create()` call) would leave a partially-completed workflow (an original claim marked REOPENED with no sub-claim yet, or a created claim with a partially-attached checklist) since each repository call commits independently rather than being wrapped in one outer transaction. This mirrors the same disclosed pattern noted for `apply_transition()`'s internal two-statement transaction in the Group D report, but is one level up (across separate repository calls, not within one). No AC in E4-S1 or E7-S2 requires cross-call atomicity, and both docstrings disclose the tradeoff explicitly rather than silently. Worth a future story if operational experience shows this edge case matters in practice; not a defect against any current AC.
+2. `admin_override_service.py`'s `FORCE_RETRY` disambiguation via an explicit `target_event` parameter is a reasonable, disclosed resolution of a genuine spec gap (the AC text never anticipates `PROCESSING_FAILED` having 3 valid retry destinations), consistent with how prior groups' generators have handled similarly undocumented edges — noted as a positive, not a defect.
+
+## Files reviewed
+
+- `specs/stories/E4-S1.md`, `E5-S2.md`, `E6-S1.md`, `E7-S2.md`, `E8-S2.md`
+- `specs/design/component-map.md` (Service/E and Service/F rows, cross-checked E4-S3/E7-S2 scope boundary)
+- `specs/design/api-contracts.md`
+- `.claude/architecture.md`
+- `backend/src/services/fnol_intake_service.py`, `fraud_scoring_engine.py`, `assessment_service.py`, `reopen_service.py`, `admin_override_service.py`
+- `backend/src/repositories/claim_repository.py` (re-read in full for the `exists_duplicate()` / `reopen()` interaction check)
+- `backend/tests/unit/services/test_fnol_intake_service.py`, `test_fraud_scoring_engine.py`, `test_assessment_service.py`, `test_reopen_service.py`, `test_admin_override_service.py`
+- `git log --oneline -- backend/src/services` (confirmed the 5 commit hashes for this group)
+- `features.json` (F040-F043, F055-F058, F063-F067, F081-F084, F089-F092 — 21 features — updated to `passes: true` following this evaluation; verified via `git diff --stat` that exactly 42 lines changed, matching 21 features x 2 modified fields (`passes`, `last_evaluated`) each)

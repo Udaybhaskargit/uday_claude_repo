@@ -35,24 +35,32 @@ class ClaimRepository:
         claim_type: ClaimType,
         incident_date: str,
         claim_amount: Decimal,
+        parent_claim_id: int | None = None,
     ) -> int:
         """Insert a new claim row with `status='INTAKE'` and return its id.
 
         `claim_amount` is stored as a canonical decimal string, e.g.
         `str(Decimal("35000.00"))`, per the Money-fields convention in
         data-models.md (AC1).
+
+        `parent_claim_id` (E7-S2 AC1) links a reopened sub-claim back to the
+        original claim it disputes; it is optional and defaults to `None` for
+        every ordinary (non-reopen) FNOL submission, so this is a
+        backward-compatible additive change -- every existing caller that
+        omits it keeps getting `NULL` in that column, unchanged from before.
         """
         now = datetime.now(UTC).isoformat()
         cursor = self._connection.execute(
             "INSERT INTO claims "
             "(policy_id, claim_type, incident_date, claim_amount, status, "
-            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "parent_claim_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 policy_id,
                 claim_type.value,
                 incident_date,
                 str(Decimal(claim_amount)),
                 ClaimStatus.INTAKE.value,
+                parent_claim_id,
                 now,
                 now,
             ),

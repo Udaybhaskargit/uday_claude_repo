@@ -634,8 +634,8 @@
       "Action: Submit_fnol() is called.",
       "Assert: A Claim is created with claim_type='MOTOR' and two ClaimDocument rows (POLICE_FIR, INVOICE) each MISSING."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -650,8 +650,8 @@
       "Action: Submitted.",
       "Assert: The checklist rows are exactly HOSPITAL_BILL and DISCHARGE_SUMMARY."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -666,8 +666,8 @@
       "Action: Submitted.",
       "Assert: The checklist row is exactly DEATH_CERTIFICATE."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -682,8 +682,8 @@
       "Action: It completes.",
       "Assert: The claim's initial status is INTAKE and, once checklist rows are attached, it transitions to DOCS_PENDING."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -874,8 +874,8 @@
       "Action: Scored.",
       "Assert: The total is 40 and flagged is False, since 40 is below threshold 60."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -890,8 +890,8 @@
       "Action: Scored.",
       "Assert: The total is 65 (40+25) and flagged is True."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -906,8 +906,8 @@
       "Action: The two results are compared.",
       "Assert: Both runs produce an identical score and rule breakdown, demonstrating determinism."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -922,8 +922,8 @@
       "Action: Scored.",
       "Assert: The +15 rule is included in the breakdown with its rule name."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1002,8 +1002,8 @@
       "Action: Assessed.",
       "Assert: Payable_amount equals 35000 (40000 minus the 5000 deductible, no co-pay)."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1018,8 +1018,8 @@
       "Action: Assessed.",
       "Assert: The 1000 deductible and 10% co-pay of 19000 (=1900) yield payable_amount 17100."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1034,8 +1034,8 @@
       "Action: Assessed.",
       "Assert: Payable_amount equals min(200000,150000) = 150000 with no deductions."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1050,8 +1050,8 @@
       "Action: Assessed.",
       "Assert: Payable_amount is clamped to 0 and is never negative."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1066,8 +1066,8 @@
       "Action: Its type is inspected.",
       "Assert: Payable_amount is a Decimal and the computation used no float arithmetic at any step."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1290,8 +1290,8 @@
       "Action: Reopen() is called.",
       "Assert: A new Claim row is created with parent_claim_id set to the original's id and status='INTAKE'."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1306,8 +1306,8 @@
       "Action: The original claim is re-read.",
       "Assert: Its historical Decision, Settlement, and Assessment rows are unchanged: still readable, not deleted or edited."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1322,8 +1322,8 @@
       "Action: The original claim's status is re-read.",
       "Assert: It is REOPENED, having been set via the state-machine gate rather than a direct column write."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1338,8 +1338,8 @@
       "Action: Reopen() is called.",
       "Assert: It raises InvalidClaimStateException."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1418,8 +1418,8 @@
       "Action: Override() is called with a command and reason code.",
       "Assert: An AdminOverride row is inserted recording the admin actor, command, reason_code, and timestamp."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1434,8 +1434,8 @@
       "Action: Validated.",
       "Assert: It raises a typed validation error and no override row is inserted."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1450,8 +1450,8 @@
       "Action: Applied.",
       "Assert: The status change goes through the E1-S2 transition gate, and an invalid target status raises InvalidClaimStateException."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1466,8 +1466,8 @@
       "Action: The second call runs against the now-stale state.",
       "Assert: It fails with InvalidClaimStateException rather than silently double-applying, per BRD section 11 concurrency handling."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T03:49:29Z",
     "failure_reason": null,
     "failure_layer": null
   },
