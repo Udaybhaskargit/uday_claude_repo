@@ -219,3 +219,46 @@ notes: Group F complete -- E4-S2 (policy-active validation) and E4-S3 (duplicate
 next_action: Independently re-verify Group F (a fresh evaluator pass didn't run in this session),
   then merge its PR and run /auto --mode full to begin Group G (E6-S2 decision engine, E9-S2
   document verification API, E11-S4 admin dashboard UI -- 12 features)
+
+=== Session 9 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C, D, E, F] (G partially -- backend stories only, see below)
+groups_remaining: [G (E11-S4 UI only), H, I, J, K]
+current_group: G
+current_stories: []
+sprint_contract: none
+last_commit: (pending -- see PR opened this session)
+features_passing: 91 / 130
+coverage: 100%
+learned_rules: 0
+blocked_stories: E11-S4 (admin dashboard UI) -- no frontend project exists yet at frontend/
+  (specs/design/folder-structure.md documents the intended React/Tailwind layout, but nothing has
+  been scaffolded). Building a frontend from scratch was judged out of scope for this run; deferred
+  to whichever session first sets up the frontend scaffold (likely needed by E10-S1 in Group J
+  anyway, so may be worth doing once ahead of both).
+notes: Group G's two backend stories landed: E6-S2 added services/decision_engine.py -- a pure
+  decide(payable_amount, flagged, ceiling) rule (precedence: zero payable always rejects even if
+  flagged, else flagged always means manual review, else the ceiling decides) plus a run_decision()
+  persistence+gating entrypoint that (unlike E6-S1's computation-only assess()) is the first thing
+  to actually call AssessmentRepository.insert(), then reads the claim's latest FraudScreening,
+  decides, persists the append-only Decision row, and gates ASSESSMENT -> {AUTO_APPROVED,
+  MANUAL_REVIEW, REJECTED} via the same apply_transition() gate every other service uses. Note for
+  whoever builds E6-S3 (Group H) or debugs a flagged-at-decision-time case: fraud_screening_service
+  already gates FRAUD_SCREENING -> MANUAL_REVIEW on a flagged first screening, so a claim only ever
+  reaches ASSESSMENT carrying flagged=True via a *later* re-screening after the original gate
+  passed (e.g. a future retry path) -- decision_engine's own tests simulate this by inserting a
+  second FraudScreening row directly, since no such retry path is wired up yet. E9-S2 added
+  api/routers/documents_router.py + api/schemas/documents_schemas.py (GET
+  /api/claims/documents/pending, PATCH /api/claims/{id}/documents/{type}), a thin HTTP adapter over
+  E5-S1's document_checklist_service with one small addition: a new
+  document_checklist_service.list_outstanding_documents() helper feeding the pending-queue response.
+  Only "VERIFIED" is accepted as a PATCH request value (disclosed limitation: no repository method
+  exists to flip a row back to MISSING, so no such capability was invented for this router either).
+  283 tests passed, 100% coverage (1052/1052 stmts), ruff clean, mypy clean -- run directly in this
+  session (a fork of the coordinator's own session, which per its own operating constraints could
+  not spawn a separate evaluator subagent this run); flagging this the same way Group F's session
+  did, for the coordinator to arrange independent re-verification before merging.
+next_action: Independently re-verify Group G's backend stories (E6-S2, E9-S2), merge its PR, then
+  decide whether to scaffold frontend/ before or alongside Group H, and separately schedule E11-S4
+  once that scaffold exists.

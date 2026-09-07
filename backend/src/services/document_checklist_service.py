@@ -57,6 +57,30 @@ def check_documents_complete(
     return all_verified
 
 
+def list_outstanding_documents(conn: sqlite3.Connection, claim_id: int) -> list[DocumentType]:
+    """Return the claim-type checklist entries for `claim_id` still MISSING.
+
+    Used by the E9-S2 pending-documents queue (`documents_router.py`) to
+    report, per claim, exactly which of its own checklist items remain
+    outstanding -- reusing the same `CHECKLISTS`/verified-set logic as
+    `check_documents_complete()` rather than re-deriving it.
+
+    Raises `LookupError` if no claim with `claim_id` exists.
+    """
+    claim = ClaimRepository(conn).get_by_id(claim_id)
+    if claim is None:
+        raise LookupError(f"Claim {claim_id} not found.")
+
+    required_types = CHECKLISTS[claim.claim_type]
+    documents = ClaimDocumentRepository(conn).list_by_claim(claim_id)
+    verified_types = {
+        document.document_type
+        for document in documents
+        if document.verification_status == VerificationStatus.VERIFIED
+    }
+    return [doc_type for doc_type in required_types if doc_type not in verified_types]
+
+
 def verify_document(
     conn: sqlite3.Connection, claim_id: int, document_type: DocumentType
 ) -> ClaimDocument:

@@ -12,6 +12,7 @@ from src.db.migration_runner import run_migrations
 from src.repositories.claim_repository import ClaimRepository
 from src.services.document_checklist_service import (
     check_documents_complete,
+    list_outstanding_documents,
     verify_document,
 )
 from src.services.fnol_intake_service import submit_fnol
@@ -151,3 +152,24 @@ class TestUnknownClaimId:
     def test_verify_document_raises_lookup_error(self, conn: sqlite3.Connection) -> None:
         with pytest.raises(LookupError):
             verify_document(conn, 999999, DocumentType.POLICE_FIR)
+
+    def test_list_outstanding_documents_raises_lookup_error(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        with pytest.raises(LookupError):
+            list_outstanding_documents(conn, 999999)
+
+
+class TestListOutstandingDocuments:
+    def test_lists_only_the_still_missing_checklist_items(
+        self, conn: sqlite3.Connection, motor_claim_id: int
+    ) -> None:
+        """F097's underlying data source: outstanding items shrink as items verify."""
+        assert set(list_outstanding_documents(conn, motor_claim_id)) == {
+            DocumentType.POLICE_FIR,
+            DocumentType.INVOICE,
+        }
+
+        verify_document(conn, motor_claim_id, DocumentType.POLICE_FIR)
+
+        assert list_outstanding_documents(conn, motor_claim_id) == [DocumentType.INVOICE]
