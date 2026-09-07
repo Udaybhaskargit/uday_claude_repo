@@ -554,3 +554,44 @@ next_action: Independent evaluator re-verification of this PR, then merge -- thi
   /api/admin/claims/{id}/retry, referenced in api-contracts.md as an extension but never built),
   and closing the small disclosed nits logged across the evaluator reports (decide()'s untested
   flagged+above-ceiling combination, F122's coverage gap, etc.).
+
+=== Session 15 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C, D, E, F, G, H, I, J, K]
+groups_remaining: []
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: 1166515 "feat(ui): Group J/K -- customer portal + assessor workbench UI (E10-S1..S3, E11-S3) -- completes 130/130 (#15)"
+features_passing: 130 / 130
+coverage: backend 100% (1358/1358 stmts); frontend 25/25 vitest, 24/24 Playwright e2e (full suite)
+learned_rules: 0
+blocked_stories: none
+notes: MILESTONE -- full 130/130 feature build complete and merged to main. This session: (1)
+  resolved a real three-way merge (evaluator-report.md, claude-progress.txt append-only conflicts;
+  backend/src/main.py's router-order fix from Group I vs. the UI catch-up branch's CORS addition,
+  both kept) between PR #13 (Group I) and PR #14 (E11-S1/E11-S4 UI catch-up), which had diverged in
+  parallel worktrees; (2) independently evaluated Group I, the UI catch-up, and the final Group J/K
+  PR via dedicated evaluator agents/teammates (all PASS, no blocking defects across any of them);
+  (3) tightened CORS from allow_origins=["*"] to the project's one documented dev origin
+  (specs/design/deployment.md: http://localhost:5173) per the evaluator's non-blocking
+  recommendation, updating test_cors.py's assertions and adding a negative-origin test; (4) fixed a
+  real bug the merge surfaced: AuthContext's new sessionStorage persistence leaks an actor across
+  vitest tests within the same file (jsdom's sessionStorage persists per-file, not per-test), fixed
+  once in tests/setup.ts's global afterEach; (5) fixed a real Decimal-discipline violation flagged
+  by the final PR's evaluator: CustomerFnolPage.tsx sent claim_amount as
+  Number(claimAmount).toFixed(2), round-tripping user-entered money through a JS float before
+  serializing -- changed to send the validated input string directly (backend already accepts any
+  valid Decimal string), updated the one test asserting the old formatted payload.
+  Full gate suite re-verified on main after every merge: backend 341 tests/100% coverage/ruff+mypy
+  clean; frontend 25/25 vitest, clean typecheck/lint/build, 24/24 Playwright against a live seeded
+  backend (whole-app regression, not just new specs).
+  Non-blocking items logged across evaluator reports for future work (not required by the capstone's
+  130-feature scope): decide()'s untested flagged+above-ceiling combination (Group G/H reports),
+  F122's refresh-clears test-coverage gap (Group I report), GET /api/claims/fraud-alerts' missing
+  status filter meaning decided claims never leave that queue (Group J/K report), and
+  retry_pipeline()'s admin HTTP endpoint referenced in api-contracts.md but never built.
+next_action: None required for the capstone's 130-feature scope -- build complete. If continuing:
+  a full /review pass (security-reviewer + evaluator) across the whole codebase, and the
+  non-blocking backlog items noted above.
