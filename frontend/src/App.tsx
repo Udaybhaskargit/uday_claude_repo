@@ -48,7 +48,7 @@ function AppShell() {
           <Route
             path="/documents/pending"
             element={
-              <RoleGuard allow={[Role.ASSESSOR]}>
+              <RoleGuard allow={[Role.ASSESSOR, Role.ADMIN]}>
                 <DocumentQueuePage />
               </RoleGuard>
             }

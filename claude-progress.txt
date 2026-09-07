@@ -362,6 +362,72 @@ next_action: Independently re-verify Group H (E6-S3, E9-S3), merge its PR, then 
   Group I (E7-S1 settlement service, E11-S2 fraud alert queue UI).
 
 === Session 12 ===
+date: 2026-09-07T10:30:00Z
+mode: catch-up (dispatched directly, outside /auto)
+groups_completed: [A, B, C, D, E, F, G (backend), H (backend), frontend scaffold, H (E11-S1 UI), G (E11-S4 UI)]
+groups_remaining: [I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: (pending -- see PR opened this session)
+features_passing: 105 / 130
+coverage: unit -- 9/9 new frontend tests passing; e2e -- 8/8 Playwright tests passing (1
+  pre-existing smoke + 7 new); backend -- 317/317 pytest (315 pre-existing + 2 new CORS tests)
+learned_rules: 0
+blocked_stories: none
+notes: Built the two UI stories that were deferred until frontend/ existed -- E11-S1 (document
+  verification queue, F118-F120) and E11-S4 (admin dashboard, F127-F130) -- run in an isolated
+  worktree (group-e/core-services base at Group H) to avoid colliding with a concurrent Group I
+  agent in the main checkout. New: frontend/src/api/documentsApi.ts + adminApi.ts (typed clients
+  over the E9-S2/E9-S4 endpoints -- response DTOs are the literal snake_case wire shape from
+  backend/src/api/schemas/*.py, deliberately distinct from the camelCase domain models in
+  types/models.ts, which mirror the backend Types layer, not any one endpoint body).
+  frontend/src/pages/DocumentQueuePage.tsx and AdminDashboardPage.tsx replace their PagePlaceholder
+  stubs; App.tsx's /documents/pending route now allows ADMIN as well as ASSESSOR, matching
+  api-contracts.md's require_role(ASSESSOR, ADMIN) (was ASSESSOR-only from the scaffold). Unit
+  tests (vitest + Testing Library) mock the api/* modules directly per testing/SKILL.md's "mock
+  only external boundaries" rule; a shared frontend/tests/utils/renderWithActor.tsx helper sets
+  AuthContext's actor for tests -- its first draft caused an infinite render loop (AuthProvider's
+  `value` -- and so `setActor`'s identity -- is recreated every time `actor` changes, so putting
+  `setActor` in the effect's own dependency array re-fires forever since setActor always creates a
+  brand-new state object); fixed by running that effect once on mount only, with a documented
+  eslint-disable for the exhaustive-deps rule.
+  IMPORTANT finding, fixed this session: the backend had no CORS policy, so the two-origin
+  deployment shape actually described by .env.example/init.sh (frontend :5173, backend :8000,
+  VITE_API_BASE_URL as an absolute cross-origin URL) was unreachable from any real browser --
+  every fetch() in httpClient.ts would be blocked before reaching a route handler. This wasn't
+  caught earlier because no prior session had run a real e2e test that made a live API call. Added
+  CORSMiddleware(allow_origins=["*"]) in backend/src/main.py (safe for this app: E8-S1 auth is a
+  header stub, no cookies/credentials in play, so allow_credentials stays at its required-False
+  default for a wildcard origin) plus backend/tests/integration/api/test_cors.py (2 tests: simple
+  GET carries Access-Control-Allow-Origin, and a preflight OPTIONS for the X-Role/X-Actor-Id
+  headers succeeds). This is the only backend/src change in this session.
+  Playwright e2e (frontend/tests/e2e/documentQueue.spec.ts, adminDashboard.spec.ts) run against a
+  real backend, not mocks -- seeded via new backend/scripts/seed_e2e_db.py (test/dev tooling, not
+  a production layer; reuses run_migrations()/submit_fnol() plus the raw-INSERT patterns already
+  used by test_admin_router.py/test_documents_router.py). Seeding via a script was necessary
+  because the E9-S1 claims-intake router (POST /api/claims) isn't mounted on this branch yet (it's
+  Group I, not merged here), so there is no running-app way to create a claim otherwise. Each e2e
+  spec file is forced test.describe.configure({mode:"serial"}) since later ACs mutate the same
+  seeded claims the earlier read-only ACs assert against, and Playwright's global fullyParallel
+  would otherwise race them against the one shared seeded DB.
+  All 4 frontend gates run directly in this session: `npm test` 9/9 passing (3 files), `npm run
+  lint` 0 errors (2 warnings, both the same "dual export" react-refresh pattern already accepted
+  for AuthContext.tsx in the scaffold), `npm run typecheck` clean, `npx playwright test` 8/8
+  passing against a live seeded backend + live Vite dev server (both started and stopped manually
+  in this session; not part of playwright.config.ts's webServer, which only manages the frontend).
+  Backend: `uv sync` + `uv pip install -r requirements.txt` needed to provision backend/.venv first
+  (fastapi/uvicorn/etc weren't installed under any interpreter already on PATH); `uv run pytest -x
+  -q` 317/317 passing, `uv run ruff check` clean, `uv run mypy src` clean.
+  Updated features.json for F118-F120 and F127-F130 only (98 -> 105 passing); no other feature rows
+  touched.
+next_action: Self-verified only in this session -- no independent evaluator pass was run against
+  this PR (coordinator should dispatch one, or accept this report, before merging). After merge,
+  resume Group I (E7-S1 settlement service, E9-S1 claims intake API, E11-S2 fraud alert queue UI)
+  -- note E9-S1 landing will make backend/scripts/seed_e2e_db.py's workaround unnecessary for
+  future e2e runs against claims created through the real API.
+
+=== Session 13 ===
 date: 2026-09-07T00:00:00Z
 mode: full
 groups_completed: [A, B, C, D, E, F, G, H]
