@@ -36,16 +36,35 @@ class PolicyRepository:
             (policy_number,),
         ).fetchone()
 
-        if row is None:
-            return None
+        return None if row is None else _row_to_policy(row)
 
-        return Policy(
-            id=row["id"],
-            policy_number=row["policy_number"],
-            product_type=ClaimType(row["product_type"]),
-            status=PolicyStatus(row["status"]),
-            sum_insured=Decimal(row["sum_insured"]),
-            effective_date=row["effective_date"],
-            expiry_date=row["expiry_date"],
-            created_at=row["created_at"],
-        )
+    def get_by_id(self, policy_id: int) -> Policy | None:
+        """Look up a policy by its primary key `id`.
+
+        Added in Group F (E5-S3) so `fraud_screening_service` can resolve
+        the `Policy` a `Claim.policy_id` foreign key points at -- `claims`
+        stores the numeric id, not the human-facing `policy_number`, so the
+        E3-S2 `get_by_number()` lookup alone isn't enough for that caller.
+        Same `None`-on-miss contract as `get_by_number()`.
+        """
+        row = self._connection.execute(
+            "SELECT id, policy_number, product_type, status, sum_insured, "
+            "effective_date, expiry_date, created_at "
+            "FROM policies WHERE id = ?",
+            (policy_id,),
+        ).fetchone()
+
+        return None if row is None else _row_to_policy(row)
+
+
+def _row_to_policy(row: sqlite3.Row) -> Policy:
+    return Policy(
+        id=row["id"],
+        policy_number=row["policy_number"],
+        product_type=ClaimType(row["product_type"]),
+        status=PolicyStatus(row["status"]),
+        sum_insured=Decimal(row["sum_insured"]),
+        effective_date=row["effective_date"],
+        expiry_date=row["expiry_date"],
+        created_at=row["created_at"],
+    )

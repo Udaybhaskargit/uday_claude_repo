@@ -14,7 +14,7 @@ persists the result.
 from __future__ import annotations
 
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from src.types.enums import ClaimEvent, ClaimStatus, ClaimType
@@ -173,6 +173,40 @@ class ClaimRepository:
             (policy_id, incident_date),
         ).fetchone()
         return row is not None
+
+    def count_recent_claims(
+        self,
+        policy_id: int,
+        before_date: str,
+        window_days: int,
+        exclude_claim_id: int | None = None,
+    ) -> int:
+        """Count claims on `policy_id` filed in the `window_days` before `before_date`.
+
+        Added in Group F (E5-S3) to supply `FraudScoringInput.recent_claim_
+        count_90d` (the CLAIM_FREQUENCY rule). The window is the half-open
+        interval `(before_date - window_days, before_date]` -- inclusive of
+        `before_date` itself so a same-day prior claim counts, exclusive of
+        the far edge so exactly `window_days` ago does not double-count
+        against an adjacent window. `exclude_claim_id` lets a caller omit the
+        very claim being scored from its own frequency count, since that
+        claim's own row already exists in `claims` by the time scoring runs.
+        """
+        window_start = (date.fromisoformat(before_date) - timedelta(days=window_days)).isoformat()
+
+        query = (
+            "SELECT COUNT(*) AS n FROM claims "
+            "WHERE policy_id = ? AND incident_date > ? AND incident_date <= ?"
+        )
+        params: list[int | str] = [policy_id, window_start, before_date]
+
+        if exclude_claim_id is not None:
+            query += " AND id != ?"
+            params.append(exclude_claim_id)
+
+        row = self._connection.execute(query, params).fetchone()
+        count: int = row["n"]
+        return count
 
 
 def _row_to_claim(row: sqlite3.Row) -> Claim:

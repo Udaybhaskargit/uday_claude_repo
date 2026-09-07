@@ -698,8 +698,8 @@
       "Action: Submit_fnol() is called referencing it.",
       "Assert: PolicyNotActiveException is raised and no Claim row is created."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -714,8 +714,8 @@
       "Action: Submitted.",
       "Assert: PolicyNotActiveException is raised."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -730,8 +730,8 @@
       "Action: Submitted.",
       "Assert: No exception is raised and intake proceeds."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -746,8 +746,8 @@
       "Action: Serialized.",
       "Assert: The response uses reason code POLICY_INACTIVE."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -762,8 +762,8 @@
       "Action: A second FNOL for (P, D) is submitted.",
       "Assert: DuplicateClaimException is raised and no new Claim row is created."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -778,8 +778,8 @@
       "Action: A new FNOL for (P, D2) with D2 not equal to D1 is submitted.",
       "Assert: It succeeds and creates a second, independent claim."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -794,8 +794,8 @@
       "Action: Serialized.",
       "Assert: The HTTP response status is 409."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -810,8 +810,8 @@
       "Action: Check_documents_complete() is called.",
       "Assert: It returns False and the claim remains DOCS_PENDING."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -826,8 +826,8 @@
       "Action: Checked.",
       "Assert: It returns True and the claim transitions to FRAUD_SCREENING."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -842,8 +842,8 @@
       "Action: Its checklist is evaluated.",
       "Assert: Only HOSPITAL_BILL and DISCHARGE_SUMMARY are considered, ignoring motor/life document types."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -858,8 +858,8 @@
       "Action: Verify_document() is called.",
       "Assert: It raises a typed validation error."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -938,8 +938,8 @@
       "Action: The result is persisted.",
       "Assert: The FraudScreening row stores the threshold that was active at scoring time, not the current config value."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -954,8 +954,8 @@
       "Action: Persisted.",
       "Assert: The claim moves toward MANUAL_REVIEW with reason code FRAUD_FLAG."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -970,8 +970,8 @@
       "Action: Persisted.",
       "Assert: The claim moves toward ASSESSMENT."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -986,8 +986,8 @@
       "Action: Both are persisted.",
       "Assert: Both rows remain independently queryable with no overwrite, per NFR-02."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1642,8 +1642,8 @@
       "Action: GET /api/admin/claims?status=MANUAL_REVIEW&product=MOTOR is called.",
       "Assert: Only matching claims are returned."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1658,8 +1658,8 @@
       "Action: GET /api/admin/payouts is called.",
       "Assert: The response lists every Settlement row with claim id, amount, and timestamp as an immutable audit trail."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1674,8 +1674,8 @@
       "Action: POST /api/admin/claims/{id}/override is called with a command and reason code.",
       "Assert: The response is 200 and the created AdminOverride is visible in a subsequent GET /api/admin/claims/{id}/overrides."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1690,8 +1690,8 @@
       "Action: Any /api/admin/* endpoint is called.",
       "Assert: The response is 403."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T05:41:31.609119+00:00",
     "failure_reason": null,
     "failure_layer": null
   },

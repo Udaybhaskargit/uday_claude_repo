@@ -393,3 +393,49 @@ class TestExistsDuplicate:
         repo = ClaimRepository(conn)
 
         assert repo.exists_duplicate(policy_id, "2026-05-01") is False
+
+
+class TestCountRecentClaims:
+    """Group F (E5-S3) addition: supplies FraudScoringInput.recent_claim_count_90d."""
+
+    def test_counts_claims_within_window_inclusive_of_before_date(
+        self, conn: sqlite3.Connection, policy_id: int
+    ) -> None:
+        _insert_claim_row(conn, policy_id=policy_id, incident_date="2026-01-10")
+        _insert_claim_row(conn, policy_id=policy_id, incident_date="2026-03-10")
+        repo = ClaimRepository(conn)
+
+        count = repo.count_recent_claims(policy_id, before_date="2026-03-10", window_days=90)
+
+        assert count == 2
+
+    def test_excludes_claims_outside_the_window(
+        self, conn: sqlite3.Connection, policy_id: int
+    ) -> None:
+        _insert_claim_row(conn, policy_id=policy_id, incident_date="2025-11-01")
+        repo = ClaimRepository(conn)
+
+        count = repo.count_recent_claims(policy_id, before_date="2026-03-10", window_days=90)
+
+        assert count == 0
+
+    def test_excludes_a_named_claim_id(self, conn: sqlite3.Connection, policy_id: int) -> None:
+        claim_id = _insert_claim_row(conn, policy_id=policy_id, incident_date="2026-03-10")
+        repo = ClaimRepository(conn)
+
+        count = repo.count_recent_claims(
+            policy_id, before_date="2026-03-10", window_days=90, exclude_claim_id=claim_id
+        )
+
+        assert count == 0
+
+    def test_ignores_claims_on_a_different_policy(
+        self, conn: sqlite3.Connection, policy_id: int
+    ) -> None:
+        other_policy_id = _insert_policy(conn, policy_number="POL-OTHER")
+        _insert_claim_row(conn, policy_id=other_policy_id, incident_date="2026-03-10")
+        repo = ClaimRepository(conn)
+
+        count = repo.count_recent_claims(policy_id, before_date="2026-03-10", window_days=90)
+
+        assert count == 0

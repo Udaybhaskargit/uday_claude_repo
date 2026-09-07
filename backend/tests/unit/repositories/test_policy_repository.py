@@ -103,6 +103,34 @@ def test_is_active_on_returns_false_outside_policy_window(tmp_path: Path) -> Non
         conn.close()
 
 
+def test_get_by_id_returns_policy_with_matching_fields(tmp_path: Path) -> None:
+    """Group F (E5-S3) addition: lookup by numeric primary key."""
+    conn = _seed_connection(tmp_path)
+    try:
+        _insert_policy(conn, policy_number="POL-004", sum_insured="250000.00")
+        repo = PolicyRepository(conn)
+        by_number = repo.get_by_number("POL-004")
+        assert by_number is not None
+
+        by_id = repo.get_by_id(by_number.id)
+
+        assert by_id is not None
+        assert by_id.policy_number == "POL-004"
+        assert by_id.sum_insured == Decimal("250000.00")
+    finally:
+        conn.close()
+
+
+def test_get_by_id_returns_none_when_not_found(tmp_path: Path) -> None:
+    conn = _seed_connection(tmp_path)
+    try:
+        repo = PolicyRepository(conn)
+
+        assert repo.get_by_id(9999) is None
+    finally:
+        conn.close()
+
+
 def test_is_active_on_returns_true_inside_policy_window_for_active_status(
     tmp_path: Path,
 ) -> None:
