@@ -56,7 +56,7 @@ function AppShell() {
           <Route
             path="/fraud-alerts"
             element={
-              <RoleGuard allow={[Role.ASSESSOR]}>
+              <RoleGuard allow={[Role.ASSESSOR, Role.ADMIN]}>
                 <FraudQueuePage />
               </RoleGuard>
             }

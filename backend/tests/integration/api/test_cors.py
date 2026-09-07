@@ -19,7 +19,19 @@ def test_health_response_carries_cors_allow_origin_header() -> None:
     response = client.get("/health", headers={"Origin": "http://localhost:5173"})
 
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "*"
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_unrecognized_origin_gets_no_allow_origin_header() -> None:
+    """The policy is scoped to the project's one documented dev origin
+    (specs/design/deployment.md), not a wildcard -- a request claiming to
+    come from anywhere else must not get an Allow-Origin header back."""
+    client = TestClient(create_app())
+
+    response = client.get("/health", headers={"Origin": "http://evil.example.com"})
+
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") is None
 
 
 def test_preflight_request_is_allowed_for_a_custom_auth_header() -> None:
@@ -37,4 +49,4 @@ def test_preflight_request_is_allowed_for_a_custom_auth_header() -> None:
     )
 
     assert response.status_code == 200
-    assert response.headers.get("access-control-allow-origin") == "*"
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"

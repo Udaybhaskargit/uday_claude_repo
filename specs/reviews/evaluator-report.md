@@ -973,3 +973,71 @@ grep -rn "console\.|parseFloat|Number(" frontend/src/pages/DocumentQueuePage.tsx
 3. Likely mechanical (not semantic) merge conflict expected between this PR and PR #13 (Group I) in backend/src/main.py, since both touch that file -- flagging for the coordinator, not a defect in this PR.
 
 No production code changes were made by this evaluation pass beyond this report; features.json already correctly had passes: true for F118-F120/F127-F130 prior to this review and required no changes.
+
+---
+
+## Group I — Settlement Service, Claims API, Fraud Alert Queue (E7-S1, E9-S1, E11-S2)
+
+**Branch:** `group-i/settlement-and-fraud-queue` (PR #13, unmerged) @ `4679274`
+**Date:** 2026-09-07
+**Verification mode for this group:** `local` — backend via `.venv`/pytest against a real migrated SQLite DB (`TestClient` round trips, not mocks), frontend via `npm test`/`npx playwright test` against the live Vite dev server.
+
+Checked out `origin/group-i/settlement-and-fraud-queue`, confirmed working directory was the real repo root (not a stale `.claude/worktrees/` copy) via `pwd`, and confirmed `git diff main...group-i/settlement-and-fraud-queue --stat` matches exactly the claimed file set (14 files: `settlement_service.py`, `settlement_repository.py` additions, `claims_router.py`/`claims_schemas.py` new, `main.py` router-order change, `FraudQueuePage.tsx`, `AuthContext.tsx`, `App.tsx`, plus matching tests/`features.json`/`claude-progress.txt`) — no unrelated or out-of-scope changes.
+
+### E7-S1 — Settlement service (F077-F080): PASS
+
+Read `settlement_service.py` and `settlement_repository.py` in full and cross-checked against `tests/unit/services/test_settlement_service.py`.
+
+- **F077** (AC1, Settlement row with decision's `payable_amount` + claim to `SETTLED`) — confirmed. `settle()` reads the claim's latest `Assessment`/`Decision` only *after* the `SETTLE` state-machine transition succeeds, then inserts a `Settlement` row carrying `assessment.payable_amount` (a `Decimal`, never a float). `test_settle_auto_approved_claim_creates_settlement_and_settles` independently re-queries the raw `settlements` and `claim_state_transitions` tables (not just the returned object) and confirms the transition row's `event == "SETTLE"`, `actor_id` correctly threaded through.
+- **F078** (AC2, no update method) — confirmed via a genuine reflection check (`inspect.getmembers`) on the live `SettlementRepository` class, not a static assumption; only `insert`/`get_latest_for_claim`/`list_all` exist.
+- **F079** (AC3, stub payment reference, no real rail contact) — confirmed. `_stub_payment_trigger()` returns `f"STUB-PAY-{claim_id}-{uuid4...}"`; the test asserts the module's own bound names (`vars(module)`) contain none of `requests`/`httpx`/`urllib`/`socket`, which is stronger than a source-text grep (catches renamed/aliased imports too). A second test confirms two settlements get distinct references.
+- **F080** (AC4, refuse non-approved claim, typed error, zero writes) — confirmed genuinely, not just "returns None": `settle()` applies the `SETTLE` event via `ClaimRepository.apply_transition()` *before* any settlement code runs, so a `REJECTED`/`MANUAL_REVIEW` claim raises `InvalidClaimStateException` (the state machine's `SETTLE` event has no table entry for those states) and the settlement insert is never reached. Both `test_settle_rejected_claim_raises_and_creates_no_settlement` and `test_settle_manual_review_claim_raises_and_creates_no_settlement` independently count rows in the `settlements` table before/after and assert no change, and re-confirm the claim's status is untouched.
+
+**Money math:** confirmed `Decimal`-only end-to-end — `SettlementRepository.insert()` stores `str(payout_amount)` from a `Decimal` argument, `get_latest_for_claim()`/`list_all()` read it back via `Decimal(row["payout_amount"])`; `AssessmentRepository` (upstream source of the value) is likewise `Decimal`-typed throughout. No `float(` usage anywhere in the new code.
+
+### E9-S1 — Customer claims API (F093-F096): PASS
+
+Read `claims_router.py`/`claims_schemas.py` in full, cross-checked against `tests/integration/api/test_claims_router.py` (415 lines, real `TestClient` + migrated SQLite, not mocks).
+
+- **F093** (AC1, `POST /api/claims` returns 201 + `claim_id`/`status`) — confirmed for both MOTOR and HEALTH claim types, correct product-specific checklist returned.
+- **F094** (AC2, duplicate FNOL returns 409 `DUPLICATE_CLAIM`) — confirmed via a real double-POST against the live `fnol_intake_service.submit_fnol()`/`DuplicateClaimException` path, mapped through `error_handlers.py` to the exact envelope shape (`error.code == "DUPLICATE_CLAIM"`).
+- **F095** (AC3, reopen a `SETTLED` claim returns 201 + sub-claim id/parent id) — confirmed, plus the negative case (`test_reopen_non_settled_claim_returns_409` — a real, still-`DOCS_PENDING` claim correctly rejected with `INVALID_STATE_TRANSITION`), and unknown-id (404), wrong-role (403) cases.
+- **F096** (AC4, `GET /api/claims/{id}` returns status, `decision.reason_code` if decided, `missing_documents`) — confirmed against three real states (undecided/decided/settled), correctly returns `decision: null`/`settlement: null` until those rows exist. Verified the story text's "`decision.reason_codes`" is plain English, not a literal field name — `specs/design/api-contracts.md` line 118 documents the field as singular `reason_code`, matching the implementation exactly; not a defect.
+
+**This closes the real F047/F050 gap** flagged after Group F: `test_policy_inactive_at_incident_date_returns_422` and the duplicate-claim test now exercise `PolicyNotActiveException`/`DuplicateClaimException` end-to-end through a real HTTP route for the first time, confirmed by re-running these tests directly.
+
+### Router-ordering bug fix (`main.py`): genuine, correctly diagnosed, correctly fixed
+
+Verified this is a real bug, not a misdiagnosis, by reasoning through Starlette's actual matching semantics and confirming live: FastAPI compiles `@router.get("/{claim_id}")` into a Starlette route using a generic (non-digit-restricted) path-segment regex — the `claim_id: int` type hint is a function-parameter annotation used for *post-match* pydantic validation, not part of the route's matching pattern. So a same-HTTP-method, same-segment-depth literal route (`GET /api/claims/fraud-alerts`, 1 segment, vs. `GET /api/claims/{claim_id}`, 1 segment) genuinely collides if `claims_router` were registered first — Starlette would try `{claim_id}` first, match the string "fraud-alerts" against it, and then fail the `int` coercion with a 422 instead of ever trying the literal route.
+
+Independently confirmed live (not just by reading `main.py`): booted the real `create_app()` via `TestClient` and hit `GET /api/claims/fraud-alerts` and `GET /api/claims/documents/pending` — both reached their real handlers (surfaced a `CLAIMFLOW_DB_PATH` env-var error from application code, not a 422 routing/coercion error, which would be the signature of the bug reappearing). Also confirmed by re-running the full `test_workbench_router.py` suite (which hits `/api/claims/fraud-alerts` directly) and `test_claims_router.py` together — all pass, meaning the fix holds under the full route table, not just the one case that was caught.
+
+One imprecision in the `main.py` comment, non-blocking: it implies both `documents_router` and `workbench_router` need to precede `claims_router` for collision reasons, but only `workbench_router`'s `/fraud-alerts` (1-segment GET) actually collides with `claims_router`'s `GET /{claim_id}` (also 1-segment). `documents_router`'s literal routes (`/documents/pending`, 2 segments; `/{claim_id}/documents/{type}`, 3 segments) never had matching segment-depth/method collisions with any `claims_router` route, so its position in the mount order doesn't affect correctness — harmless, not a functional bug, just a slightly over-broad justification in the docstring.
+
+### E11-S2 — Fraud alert queue UI (F121-F123): PASS, with one test-coverage gap flagged (non-blocking)
+
+Read `FraudQueuePage.tsx`, `RoleGuard.tsx`, `App.tsx`, `AuthContext.tsx` in full, cross-checked against `tests/unit/FraudQueuePage.test.tsx`, `tests/unit/App.test.tsx`, `tests/e2e/fraud-alert-queue.spec.ts`.
+
+- **F121** (AC1, fraud score + triggered rule names + workbench link per row) — confirmed via both a Vitest RTL test and a Playwright e2e test hitting the real rendered DOM, asserting the score, rule names, and the link's actual `href="/workbench/42"`.
+- **F123** (AC3, CUSTOMER gets access-denied, queue not rendered) — confirmed genuinely at the routing layer: `App.tsx`'s `/fraud-alerts` route is gated by `RoleGuard allow={[ASSESSOR, ADMIN]}`, matching `specs/design/api-contracts.md`'s documented `require_role(ASSESSOR, ADMIN)` for the backend endpoint exactly (checked both sides side-by-side — this is a real fix of a previously-too-narrow gate, not scope creep). `frontend/tests/e2e/fraud-alert-queue.spec.ts`'s `F123` test drives this through a real browser: selects CUSTOMER, navigates to `/fraud-alerts`, and asserts the `role="alert"` access-denied panel renders and the queue heading does not.
+- **F122** (AC2, a claim whose flag clears no longer appears on refresh) — **the underlying mechanism is genuinely correct, but the test claimed to cover it does not actually exercise the AC.** The only test tagged `F122` (`FraudQueuePage.test.tsx`) is "an empty response renders no rows" — a single-fetch, always-empty scenario that never demonstrates a claim appearing and then disappearing after a refresh. I independently verified the real refresh-clears behavior by writing and running a temporary Playwright test (not committed) that: loads the queue showing a flagged claim, clicks Refresh with the mock now returning an empty list, and asserts the claim disappears — **this passed**, confirming `FraudQueuePage`'s `load()` callback (reused for both mount and the Refresh button) and the backend's real latest-screening-only filtering (already verified server-side in Group H's `test_workbench_router.py`) together do implement AC2 correctly. So this is a **test-coverage gap, not a functional defect** — recommend the generator replace or supplement the `F122`-tagged test with one that actually simulates the two-fetch refresh-clears sequence, since the current test would pass even if the Refresh button's re-fetch were broken.
+
+### `AuthContext.tsx` sessionStorage change: safe, non-breaking
+
+Reviewed the diff and traced every consumer: `RoleGuard` and all pages read `actor` via `useAuth()` only, with no assumption that `actor` starts `null` on every mount (they all handle `actor: null` as "show access denied" / "don't fetch yet" uniformly, e.g. `FraudQueuePage`'s `load()` returns early if `!actor`). `sessionStorage` access is wrapped in try/catch with a documented in-memory fallback for private-browsing/storage-blocked contexts — doesn't throw or block rendering if storage is unavailable. Confirmed no cross-test leakage risk: Vitest's default jsdom pool gives each test file its own global `window`/`sessionStorage`, and the only tests that construct `AuthContext` (`FraudQueuePage.test.tsx`) inject a value directly via `AuthContext.Provider` rather than going through `AuthProvider`'s `sessionStorage`-backed state, so they never touch real browser storage. All pre-existing frontend tests (`App.test.tsx`, full Playwright suite) still pass with this change in place.
+
+### Gates — independently reproduced
+
+**Backend** (`backend/.venv`): `pytest -x -q` -> **338 passed**. `pytest --cov=src --cov-report=term-missing -q` -> **100% (1356/1356 stmts)**, zero missing lines across all 50 source files. `ruff check .` -> **all checks passed**. `mypy src/` -> **no issues found in 50 source files**. All figures match the generator's self-report exactly.
+
+**Frontend**: `npm run typecheck` -> clean. `npm run lint` -> **0 errors** (2 pre-existing `react-refresh/only-export-components` warnings on `AuthContext.tsx`, not new errors, not blocking). `npm test` -> **3 passed** (1 `App.test.tsx` + 2 `FraudQueuePage.test.tsx`). `npm run build` -> clean production build. `npx playwright test` -> **3 passed** (`smoke.spec.ts` + 2 `fraud-alert-queue.spec.ts`). All figures match the generator's self-report exactly.
+
+### Verdict
+
+**PASS** for E7-S1, E9-S1, and E11-S2. All 11 features (F077-F080, F093-F096, F121-F123) independently confirmed as genuine passes — every AC-driving test was read in full and re-run against a real DB/browser, not sampled, and the router-ordering fix and the F122 refresh-clears mechanism were both independently verified live rather than taken on the self-report's word. No regressions found in previously-passing Groups A-H (full 338-test suite re-run, not just Group I's new tests).
+
+**Non-blocking findings to log:**
+1. `F122`'s own test (`FraudQueuePage.test.tsx`) only checks that an empty API response renders zero rows — it does not simulate the actual refresh-clears-a-previously-shown-claim sequence the AC describes. I independently confirmed the real behavior is correct via a temporary (uncommitted) Playwright test, so this is a coverage gap, not a functional bug. Recommend strengthening this specific test next time it's touched.
+2. `main.py`'s router-ordering comment implies both `documents_router` and `workbench_router` must precede `claims_router` for collision-avoidance reasons; only `workbench_router`'s single-segment `/fraud-alerts` route actually collides with `claims_router`'s single-segment `{claim_id}` route. `documents_router`'s routes never had a segment-depth/method collision. Harmless (correct code, slightly over-broad comment) — not blocking.
+
+No production code changes were made by this evaluation pass (a temporary Playwright spec used to verify F122's runtime behavior was written, run, and deleted before this commit). `features.json` timestamps refreshed for F077-F080, F093-F096, F121-F123 (all remain `passes: true`).
