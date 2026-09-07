@@ -64,7 +64,10 @@ export function CustomerFnolPage() {
         policy_number: policyNumber.trim(),
         claim_type: claimType,
         incident_date: incidentDate,
-        claim_amount: Number(claimAmount).toFixed(2),
+        // Sent as the raw validated string, not round-tripped through
+        // Number(), to match the project's Decimal-as-string discipline for
+        // money (the backend parses this directly via Decimal(...)).
+        claim_amount: claimAmount.trim(),
       });
       navigate(`/claims/${response.claim_id}`);
     } catch (err) {

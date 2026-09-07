@@ -105,7 +105,10 @@ describe("CustomerFnolPage", () => {
         policy_number: "POL-MOTOR-0001",
         claim_type: "MOTOR",
         incident_date: "2026-03-10",
-        claim_amount: "40000.00",
+        // Sent as the raw validated string (no Number()/toFixed() round
+        // trip), matching the project's Decimal-as-string discipline for
+        // money -- see CustomerFnolPage.tsx's handleSubmit.
+        claim_amount: "40000",
       },
     );
   });
