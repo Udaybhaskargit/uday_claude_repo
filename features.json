@@ -1882,8 +1882,8 @@
       "Action: Rendered.",
       "Assert: Only claims in DOCS_PENDING appear, grouped or filterable by claim type."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1898,8 +1898,8 @@
       "Action: The last outstanding item for a claim is verified.",
       "Assert: That claim disappears from this queue on the next refresh."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1914,8 +1914,8 @@
       "Action: Requested.",
       "Assert: The UI does not render the queue and shows an access-denied state instead."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -2026,8 +2026,8 @@
       "Action: The status/product filters are changed.",
       "Assert: The claim queue table updates to match without a full page reload."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -2042,8 +2042,8 @@
       "Action: Rendered.",
       "Assert: Rows are shown in reverse-chronological order and are read-only with no edit controls."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -2058,8 +2058,8 @@
       "Action: Submitted without a reason code.",
       "Assert: The form blocks submission with a validation message."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -2074,8 +2074,8 @@
       "Action: The API confirms it.",
       "Assert: The new override entry appears in that claim's audit history within the dashboard."
     ],
-    "passes": false,
-    "last_evaluated": null,
+    "passes": true,
+    "last_evaluated": "2026-09-07T10:30:00Z",
     "failure_reason": null,
     "failure_layer": null
   }
