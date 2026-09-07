@@ -4,12 +4,12 @@ Not part of the production app (Types/Config/Repository/Service/API layers) --
 this is test/dev tooling only, mirroring the raw-INSERT + `submit_fnol()`
 patterns already used by `backend/tests/integration/api/test_admin_router.py`
 and `test_documents_router.py`. Run before starting `uvicorn src.main:app`
-for a Playwright e2e session so the document-queue and admin-dashboard UI
-stories (E11-S1, E11-S4) have real DOCS_PENDING / MANUAL_REVIEW / SETTLED
-claims to render against -- the E9-S1 claims-intake router (`POST
-/api/claims`) that would otherwise create this data isn't mounted on this
-branch yet (it lands with Group I), so there is no other way to seed a
-running instance of this app.
+for a Playwright e2e session so the various UI stories (E10-S1..S3, E11-S1..
+S4) have real DOCS_PENDING / MANUAL_REVIEW / SETTLED claims -- with the
+FraudScreening/Assessment/Decision/Settlement rows each story's view expects
+-- to render against, without every e2e run depending on the full backend
+pipeline (fraud scoring, assessment, decision) having independently produced
+that state first.
 
 Usage:
     CLAIMFLOW_DB_PATH=./.e2e/claimflow.db python scripts/seed_e2e_db.py
@@ -17,6 +17,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import sys
@@ -101,6 +102,50 @@ def _insert_settlement(
     conn.commit()
 
 
+def _insert_fraud_screening(
+    conn: sqlite3.Connection,
+    claim_id: int,
+    *,
+    score: int,
+    threshold: int,
+    flagged: bool,
+    breakdown: list[dict[str, object]],
+) -> None:
+    conn.execute(
+        "INSERT INTO fraud_screenings (claim_id, score, breakdown, threshold, flagged, "
+        "created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
+        (claim_id, score, json.dumps(breakdown), threshold, int(flagged)),
+    )
+    conn.commit()
+
+
+def _insert_assessment(
+    conn: sqlite3.Connection,
+    claim_id: int,
+    *,
+    claim_amount: str,
+    sum_insured: str,
+    deductible: str,
+    co_pay: str,
+    payable_amount: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO assessments (claim_id, claim_amount, sum_insured, deductible, co_pay, "
+        "payable_amount, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+        (claim_id, claim_amount, sum_insured, deductible, co_pay, payable_amount),
+    )
+    conn.commit()
+
+
+def _mark_document_verified(conn: sqlite3.Connection, claim_id: int, document_type: str) -> None:
+    conn.execute(
+        "UPDATE claim_documents SET verification_status = 'VERIFIED', "
+        "updated_at = datetime('now') WHERE claim_id = ? AND document_type = ?",
+        (claim_id, document_type),
+    )
+    conn.commit()
+
+
 def seed(db_path: str) -> None:
     db_file = Path(db_path)
     if db_file.exists():
@@ -151,11 +196,103 @@ def seed(db_path: str) -> None:
         payment_reference=f"STUB-PAY-{settled_claim_id:07d}-01",
     )
 
+    # E10-S1: an ACTIVE policy with no claims yet, for the FNOL form to
+    # submit a brand-new claim against via the real POST /api/claims.
+    _insert_policy(conn, "POL-MOTOR-E2E-FNOL", "MOTOR")
+
+    # E10-S2: a DOCS_PENDING claim with one checklist item verified and one
+    # still outstanding, so the tracker can show both states distinctly
+    # (the E11-S1 fixtures above are all-missing, which can't prove the
+    # "distinctly from verified ones" half of the AC).
+    tracker_docs_policy = _insert_policy(conn, "POL-MOTOR-E2E-3", "MOTOR")
+    submit_fnol(
+        conn,
+        policy_number="POL-MOTOR-E2E-3",
+        claim_type=ClaimType.MOTOR,
+        incident_date="2026-03-09",
+        claim_amount=Decimal("31000.00"),
+    )
+    tracker_docs_claim_id = conn.execute(
+        "SELECT id FROM claims WHERE policy_id = ?", (tracker_docs_policy,)
+    ).fetchone()["id"]
+    _mark_document_verified(conn, tracker_docs_claim_id, "POLICE_FIR")
+
+    # E10-S2: a MANUAL_REVIEW claim with a Decision (no settlement yet), so
+    # the tracker can show a human-readable reason for an undecided-payout
+    # claim, distinct from the SETTLED case below.
+    tracker_decided_policy = _insert_policy(conn, "POL-MOTOR-E2E-4", "MOTOR")
+    tracker_decided_claim_id = _insert_claim(
+        conn,
+        tracker_decided_policy,
+        claim_type="MOTOR",
+        status="MANUAL_REVIEW",
+        claim_amount="75000.00",
+    )
+    _insert_decision(
+        conn,
+        tracker_decided_claim_id,
+        outcome="MANUAL_REVIEW",
+        reason_code="HIGH_VALUE_REVIEW",
+    )
+
+    # E10-S3: a SETTLED claim dedicated to the dispute-flow e2e test, kept
+    # separate from the E11-S4 admin-dashboard SETTLED fixture above so
+    # reopening it (which changes its status away from SETTLED) can't race
+    # against the admin dashboard's read-only payout-trail assertions.
+    dispute_policy = _insert_policy(conn, "POL-HEALTH-E2E-3", "HEALTH")
+    dispute_claim_id = _insert_claim(
+        conn, dispute_policy, claim_type="HEALTH", status="SETTLED", claim_amount="20000.00"
+    )
+    dispute_decision_id = _insert_decision(conn, dispute_claim_id)
+    _insert_settlement(
+        conn,
+        dispute_claim_id,
+        dispute_decision_id,
+        payout_amount="17100.00",
+        payment_reference=f"STUB-PAY-{dispute_claim_id:07d}-01",
+    )
+
+    # E11-S3: a MANUAL_REVIEW claim with a FraudScreening + Assessment row,
+    # so the workbench has real data to render (the E11-S4 review_claim_id
+    # above has neither, since it only exercises the admin override path).
+    workbench_policy = _insert_policy(conn, "POL-MOTOR-E2E-5", "MOTOR")
+    workbench_claim_id = _insert_claim(
+        conn,
+        workbench_policy,
+        claim_type="MOTOR",
+        status="MANUAL_REVIEW",
+        claim_amount="75000.00",
+    )
+    _insert_fraud_screening(
+        conn,
+        workbench_claim_id,
+        score=65,
+        threshold=60,
+        flagged=True,
+        breakdown=[
+            {"rule_name": "HIGH_CLAIM_TO_SUM_RATIO", "weight": 40},
+            {"rule_name": "EARLY_FILING", "weight": 25},
+        ],
+    )
+    _insert_assessment(
+        conn,
+        workbench_claim_id,
+        claim_amount="75000.00",
+        sum_insured="100000.00",
+        deductible="5000.00",
+        co_pay="0.00",
+        payable_amount="70000.00",
+    )
+
     conn.close()
     print(
         f"Seeded {db_path}: 2 DOCS_PENDING claims for the document queue, "
         f"MANUAL_REVIEW claim {review_claim_id}, and SETTLED claim "
-        f"{settled_claim_id} with a payout for the admin dashboard."
+        f"{settled_claim_id} with a payout for the admin dashboard. Also: an "
+        f"unclaimed policy for FNOL, tracker claims {tracker_docs_claim_id} "
+        f"(partially verified) and {tracker_decided_claim_id} (decided), "
+        f"dispute claim {dispute_claim_id} (SETTLED), and workbench claim "
+        f"{workbench_claim_id} (fraud-screened + assessed)."
     )
 
 
