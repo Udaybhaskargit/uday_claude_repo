@@ -208,6 +208,36 @@ class ClaimRepository:
         count: int = row["n"]
         return count
 
+    def get_last_transition(self, claim_id: int) -> ClaimStateTransition | None:
+        """Return the most recently inserted `claim_state_transitions` row.
+
+        Added in Group H (E6-S3) so `claim_pipeline_service.retry_pipeline()`
+        can determine which state a claim was in when its `PIPELINE_ERROR`
+        transition into `PROCESSING_FAILED` fired -- `apply_transition()`
+        always inserts exactly one audit row per call, so the last row for a
+        claim currently in `PROCESSING_FAILED` is necessarily that very
+        `PIPELINE_ERROR` transition, and its `from_state` is the failed step.
+        Returns `None` if `claim_id` has no transition history at all.
+        """
+        row = self._connection.execute(
+            "SELECT claim_id, from_state, to_state, event, actor_id, created_at "
+            "FROM claim_state_transitions WHERE claim_id = ? "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            (claim_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        return ClaimStateTransition(
+            from_state=ClaimStatus(row["from_state"]),
+            to_state=ClaimStatus(row["to_state"]),
+            event=row["event"],
+            timestamp=row["created_at"],
+            claim_id=row["claim_id"],
+            actor_id=row["actor_id"],
+        )
+
 
 def _row_to_claim(row: sqlite3.Row) -> Claim:
     return Claim(

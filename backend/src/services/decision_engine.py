@@ -30,6 +30,7 @@ from src.repositories.fraud_screening_repository import FraudScreeningRepository
 from src.repositories.policy_repository import PolicyRepository
 from src.services.assessment_service import assess
 from src.types.enums import ClaimEvent, DecisionOutcome, ReasonCode
+from src.types.exceptions import ValidationError
 from src.types.models import Decision
 
 _ZERO = Decimal("0")
@@ -38,6 +39,11 @@ _OUTCOME_TO_EVENT: dict[DecisionOutcome, ClaimEvent] = {
     DecisionOutcome.AUTO_APPROVE: ClaimEvent.DECISION_AUTO_APPROVE,
     DecisionOutcome.MANUAL_REVIEW: ClaimEvent.DECISION_MANUAL_REVIEW,
     DecisionOutcome.REJECT: ClaimEvent.DECISION_REJECT,
+}
+
+_ASSESSOR_OUTCOME_TO_EVENT: dict[DecisionOutcome, ClaimEvent] = {
+    DecisionOutcome.AUTO_APPROVE: ClaimEvent.ASSESSOR_APPROVE,
+    DecisionOutcome.REJECT: ClaimEvent.ASSESSOR_REJECT,
 }
 
 
@@ -129,6 +135,49 @@ def run_decision(
     claim_repository.apply_transition(claim_id, event, decided_by)
 
     DecisionRepository(conn).insert(claim_id, result.outcome, result.reason_code, decided_by)
+
+    decision = DecisionRepository(conn).get_latest(claim_id)
+    assert decision is not None
+    return decision
+
+
+def submit_assessor_decision(
+    conn: sqlite3.Connection,
+    claim_id: int,
+    outcome: DecisionOutcome,
+    reason_code: ReasonCode,
+    decided_by: str,
+) -> Decision:
+    """Persist an assessor's own outcome/reason_code on a review claim (E9-S3 AC3).
+
+    Unlike `run_decision()` (which computes `outcome`/`reason_code` itself
+    via `decide()` for an automated `ASSESSMENT`-stage run), this takes the
+    assessor's own choice as input, maps it onto the matching `ASSESSOR_*`
+    state-machine event, and persists the resulting append-only `Decision`
+    row with `decided_by` set to the assessor's own actor id.
+
+    `DecisionOutcome.MANUAL_REVIEW` has no corresponding `ASSESSOR_*` event
+    in the E1-S2 transition table for the `MANUAL_REVIEW` state -- there is
+    no "stay in manual review" self-transition an assessor can submit -- so
+    it is rejected here as `ValidationError` (422, matching api-contracts.md's
+    documented "missing/invalid outcome" error row) rather than silently
+    no-op'd or crashing with a raw `KeyError`.
+
+    Raises `LookupError` if `claim_id` doesn't exist, `ValidationError` for
+    an outcome with no assessor-usable event, and `InvalidClaimStateException`
+    (409) if the claim is not currently `MANUAL_REVIEW` -- both via
+    `ClaimRepository.apply_transition()`.
+    """
+    event = _ASSESSOR_OUTCOME_TO_EVENT.get(outcome)
+    if event is None:
+        raise ValidationError(
+            f"Outcome {outcome.value!r} cannot be submitted directly by an assessor."
+        )
+
+    claim_repository = ClaimRepository(conn)
+    claim_repository.apply_transition(claim_id, event, decided_by)
+
+    DecisionRepository(conn).insert(claim_id, outcome, reason_code, decided_by)
 
     decision = DecisionRepository(conn).get_latest(claim_id)
     assert decision is not None
