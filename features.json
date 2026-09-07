@@ -1083,7 +1083,7 @@
       "Assert: The outcome is REJECT with reason code ZERO_PAYABLE_AMOUNT."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1099,7 +1099,7 @@
       "Assert: The outcome is MANUAL_REVIEW with reason code FRAUD_FLAG."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1115,7 +1115,7 @@
       "Assert: The outcome is AUTO_APPROVE with reason code AUTO_APPROVED_LOW_RISK."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1131,7 +1131,7 @@
       "Assert: The outcome is MANUAL_REVIEW with reason code HIGH_VALUE_REVIEW."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1147,7 +1147,7 @@
       "Assert: The Decision row is append-only and records decided_by as either 'system' or an assessor actor id."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1547,7 +1547,7 @@
       "Assert: The response lists only claims currently in DOCS_PENDING with their outstanding document types."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1563,7 +1563,7 @@
       "Assert: The response reflects the update and, once all items are verified, a follow-up GET shows the claim's status as FRAUD_SCREENING."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1579,7 +1579,7 @@
       "Assert: The response is 403."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:04:40.995661+00:00",
+    "last_evaluated": "2026-09-07T06:10:18+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
