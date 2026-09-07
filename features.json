@@ -1163,7 +1163,7 @@
       "Assert: It ends in exactly one terminal state among AUTO_APPROVED, MANUAL_REVIEW, REJECTED, with a matching Decision row."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1179,7 +1179,7 @@
       "Assert: It halts at DOCS_PENDING and does not call the fraud or assessment services."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1195,7 +1195,7 @@
       "Assert: The claim transitions to PROCESSING_FAILED and the error is logged as structured JSON with no PII fields, per NFR-06."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1211,7 +1211,7 @@
       "Assert: The pipeline re-runs starting from the failed step."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1595,7 +1595,7 @@
       "Assert: The response lists only claims whose latest FraudScreening.flagged is True."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1611,7 +1611,7 @@
       "Assert: The response includes the fraud score and breakdown, the assessed payable_amount, and decision-rationale fields."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1627,7 +1627,7 @@
       "Assert: The response is 200 and a new append-only Decision row is created with decided_by set to the assessor's actor id."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T06:29:24.621578+00:00",
+    "last_evaluated": "2026-09-07T06:38:20.066637+00:00",
     "failure_reason": null,
     "failure_layer": null
   },
