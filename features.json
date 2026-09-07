@@ -1227,7 +1227,7 @@
       "Assert: A Settlement row is created with the decision's payable_amount and the claim transitions to SETTLED."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1243,7 +1243,7 @@
       "Assert: No update method exists, since the repository (E3-S4) enforces immutability."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1259,7 +1259,7 @@
       "Assert: It returns a stub confirmation reference without contacting any real external payment rail."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1275,7 +1275,7 @@
       "Assert: It is refused with a typed error and no Settlement row is created for a non-approved claim."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1483,7 +1483,7 @@
       "Assert: The response is 201 with a body containing the new claim_id and initial status."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1499,7 +1499,7 @@
       "Assert: The response is 409 with reason_code DUPLICATE_CLAIM."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1515,7 +1515,7 @@
       "Assert: The response is 201 with the new sub-claim's id and parent_claim_id."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1531,7 +1531,7 @@
       "Assert: The response body includes status, decision.reason_codes if decided, and a missing_documents list."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1931,7 +1931,7 @@
       "Assert: Each row shows the fraud score, the triggered rule names, and a link into the assessor workbench for that claim."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1947,7 +1947,7 @@
       "Assert: That claim no longer appears."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
@@ -1963,7 +1963,7 @@
       "Assert: The UI does not render the queue and shows an access-denied state instead."
     ],
     "passes": true,
-    "last_evaluated": "2026-09-07T10:13:19.569Z",
+    "last_evaluated": "2026-09-07T10:25:31.000Z",
     "failure_reason": null,
     "failure_layer": null
   },
