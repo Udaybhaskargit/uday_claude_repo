@@ -577,3 +577,156 @@ Grepped all 5 service files for `logg`, `logger`, and `print(` — **zero matche
 - `backend/tests/unit/services/test_fnol_intake_service.py`, `test_fraud_scoring_engine.py`, `test_assessment_service.py`, `test_reopen_service.py`, `test_admin_override_service.py`
 - `git log --oneline -- backend/src/services` (confirmed the 5 commit hashes for this group)
 - `features.json` (F040-F043, F055-F058, F063-F067, F081-F084, F089-F092 — 21 features — updated to `passes: true` following this evaluation; verified via `git diff --stat` that exactly 42 lines changed, matching 21 features x 2 modified fields (`passes`, `last_evaluated`) each)
+
+## Group F — API & Validation Layer (E4-S2, E4-S3, E5-S1, E5-S3, E9-S4)
+
+**Branch:** `group-f/api-and-validation` @ `8fcc795` ("feat(services,api): Group F -- validation, checklist gate, fraud persistence, admin API"), open as PR #9, not yet merged.
+
+**Verification mode for this group:** Direct pytest/ruff/mypy execution against `backend/.venv` for the service/repository layers, plus real (non-mocked) FastAPI `TestClient` integration tests for the new admin API — no Docker required for this backend-only slice.
+
+### Verdict: **PASS with one flagged defect (non-blocking for merge, blocking for trusting F047/F050 specifically)**
+
+- **E4-S2 (policy-active validation):** PASS for AC1-AC3 (F044-F046). AC4/**F047** ("reason code POLICY_INACTIVE reaches the API layer") is marked `passes: true` in `features.json` but has **no test that actually exercises it** — see defect below.
+- **E4-S3 (duplicate FNOL detection):** PASS for AC1-AC2 (F048-F049). AC3/**F050** ("HTTP response status is 409" at the API layer) has the same gap as F047 — see defect below.
+- **E5-S1 (document checklist gate):** PASS (F051-F054), fully and genuinely tested, including a mutation test I ran myself.
+- **E5-S3 (fraud screening persistence/gating):** PASS (F059-F062), fully and genuinely tested.
+- **E9-S4 (admin API):** PASS (F103-F106), fully and genuinely tested via real `TestClient` round trips through router -> service -> repository -> SQLite.
+
+---
+
+## What was independently re-run
+
+```
+cd backend && .venv/Scripts/python.exe -m pytest -x -q
+```
+Result: **261 passed**, 1 warning (unrelated upstream `starlette`/`anyio` deprecation notice).
+
+```
+.venv/Scripts/python.exe -m pytest --cov=src --cov-report=term-missing -q
+```
+Result: **261 passed**, coverage **100%** across the full `src/` tree (956/956 statements), including every new/touched module: `src/api/dependencies/db.py` (12/12), `src/api/error_handlers.py` (16/16), `src/api/routers/admin_router.py` (40/40), `src/api/schemas/admin_schemas.py` (33/33), `src/services/document_checklist_service.py` (31/31), `src/services/fraud_screening_service.py` (33/33), `src/services/fnol_intake_service.py` (31/31, up from 25/25 in Group E).
+
+```
+.venv/Scripts/python.exe -m ruff check .
+```
+Result: **All checks passed!**
+
+```
+.venv/Scripts/python.exe -m mypy src/
+```
+Result: **Success: no issues found in 40 source files.**
+
+Note on environment: `backend/requirements.txt` alone (`pip install -r requirements.txt` into a bare interpreter) fails with `ModuleNotFoundError: No module named 'fastapi'` because the repo relies on the pre-provisioned `backend/.venv` (managed via `uv`, per `backend/uv.lock`) rather than a fresh `pip install`. Not a Group F regression — `requirements.txt` is unchanged by this branch (`git diff main -- requirements.txt` is empty) and `backend/.venv` already has every dependency installed correctly. Flagging only so a future evaluator doesn't waste time on the same false start.
+
+---
+
+## Check-by-check findings
+
+### 1. E4-S2 — policy-active validation (F044-F047)
+
+Read `fnol_intake_service.submit_fnol()` (`backend/src/services/fnol_intake_service.py:86-145`): the policy lookup + `is_active_on()` check runs before `ClaimRepository.create()`, so a lapsed/out-of-window/nonexistent policy genuinely creates zero claim rows, not a created-then-rolled-back one.
+
+- **F044** (lapsed policy -> `PolicyNotActiveException`, no claim row) — `test_lapsed_policy_raises_and_creates_no_claim` re-queries `SELECT COUNT(*) FROM claims` directly after the exception, confirms `0`. Genuine.
+- **F045** (incident after expiry -> exception) — `test_incident_after_expiry_raises`. Genuine.
+- **F046** (in-window -> proceeds) — `test_incident_within_window_proceeds` confirms `claim.status == DOCS_PENDING`, i.e. the whole downstream pipeline actually ran, not just "no exception." Genuine.
+- **F047** (reason code `POLICY_INACTIVE` reaches the API layer) — **marked `passes: true` but not independently verified by any test.** See "Defect" section below.
+
+An extra, unrequested-but-sound test (`test_unresolvable_policy_number_raises_policy_not_active`) confirms an entirely nonexistent `policy_number` is treated the same as an inactive one, since `src/types/exceptions.py` has no separate "policy not found" typed exception — a reasonable, disclosed design choice (documented in the service's own module docstring), not a defect.
+
+### 2. E4-S3 — duplicate FNOL detection (F048-F050)
+
+- **F048** (duplicate `(policy, date)` -> `DuplicateClaimException`, no second claim row) — `test_duplicate_policy_and_date_raises_and_creates_no_second_claim` re-queries `SELECT COUNT(*) FROM claims` and confirms it stays at `1` after the second, rejected submission. Genuine.
+- **F049** (distinct incident date on same policy succeeds) — `test_distinct_incident_date_on_same_policy_succeeds` confirms a second, independent claim is actually created (`DOCS_PENDING` status reached). Genuine.
+- **F050** (HTTP 409 at the API layer) — **marked `passes: true` but not independently verified by any test.** See "Defect" section below.
+
+The duplicate check (`ClaimRepository.exists_duplicate()`, a Group D repository method) runs after the policy-active check and before `ClaimRepository.create()`, so both E4-S2 and E4-S3 validations are guaranteed to leave behind zero partial claim rows on failure — confirmed by reading the control flow directly, not inferred.
+
+### 3. Defect — F047 and F050 are rubber-stamped: the API-layer mapping they describe is never actually exercised by any test
+
+This is the one substantive finding from this review, and I verified it empirically rather than by inspection alone.
+
+`error_handlers.py`'s `_DOMAIN_EXCEPTION_ERROR_CODES` dict maps `PolicyNotActiveException -> ApiErrorCode.POLICY_INACTIVE` and `DuplicateClaimException -> ApiErrorCode.DUPLICATE_CLAIM`, and `register_error_handlers()`'s `_handle_domain_exception` reads `exc.http_status_code` (422 and 409 respectively) directly off the exception class. By reading the code, both mappings are correct. **But no route in this branch (or on `main`) currently raises either of these two exceptions** — `POST /api/claims`, the only endpoint that would call `submit_fnol()`, is E9-S1 (Group I) and does not exist yet. `grep -rln "PolicyNotActiveException\|DuplicateClaimException" tests/` shows these two exceptions are only referenced in `test_fnol_intake_service.py` (service-layer-only, no HTTP layer involved) and `test_exceptions.py` (asserts `http_status_code` class attributes directly on the exception classes, again with no FastAPI/TestClient involvement at all). There is no `test_error_handlers.py` and no synthetic-route test analogous to how `test_admin_router.py` proves the `InvalidClaimStateException`/`LookupError`/`ValidationError` mappings work end-to-end through a real `TestClient`.
+
+I confirmed this is a real gap, not just an absence-of-evidence concern, via mutation testing: I temporarily swapped the two error-code mapping entries in `src/api/error_handlers.py` (so a `PolicyNotActiveException` would serialize with `code: "DUPLICATE_CLAIM"` and vice versa), re-ran the full suite, and got **261 passed, 0 failed** — zero test failures. Reverted via `git checkout -- src/api/error_handlers.py`, confirmed `git status --short` clean.
+
+This proves F047 ("the response uses reason code POLICY_INACTIVE") and F050 ("the HTTP response status is 409" — status is separately correct since it's read off `http_status_code`, but the broader AC intent of "serialized correctly at the API layer" is what's untested) are currently unverified claims in `features.json`, not verified ones. Per this project's own constraint (CLAUDE.md: "Every acceptance criterion... must have at least one test that references its AC-N identifier"), this is a gap that should be closed — ideally now, with a lightweight synthetic-route test against `register_error_handlers()` (the same pattern `test_admin_router.py` already uses for the three exception types it does cover), rather than deferred silently to E9-S1.
+
+**Impact assessment:** Low severity in practice — I independently confirmed by direct code reading that the mapping is in fact correct as shipped (not just "untested," but "untested and currently correct"). This is not a functional regression today (no route can trigger the broken/untested path yet), and it does not block merging Group F, since nothing in Groups G/H/I depends on this specific mapping being tested yet. However, it should not be treated as done: I recommend the generator either (a) add a `test_error_handlers.py` with a throwaway FastAPI test app + route that raises each of `PolicyNotActiveException`/`DuplicateClaimException` and asserts the full JSON envelope (code + status), mirroring `test_admin_router.py`'s pattern, before E9-S1 lands, or (b) explicitly re-verify F047/F050 as part of E9-S1's own evaluation once `POST /api/claims` exists and can exercise this path for real, and correct `features.json`'s `last_evaluated` semantics at that point (currently E9-S1's own claims-API features, F093-F096, are marked `passes: false`, so the dependency is at least visible).
+
+### 4. E5-S1 — document checklist gate (F051-F054): PASS, verified with my own mutation test
+
+Read `document_checklist_service.py` in full. `check_documents_complete()` computes `required_types <= verified_types` (Python set subset) restricted to `CHECKLISTS[claim.claim_type]` — the single source of truth already seeded by `fnol_intake_service.CHECKLISTS`, reused rather than redefined, so the two can't drift apart.
+
+- **F051** (POLICE_FIR still MISSING -> `False`, stays `DOCS_PENDING`) — genuine, re-queries claim status after the call.
+- **F052** (both VERIFIED -> `True`, transitions to `FRAUD_SCREENING`) — genuine, additionally asserts the `claim_state_transitions` row (`event=DOCS_VERIFIED`).
+- **F053** (health claim only considers HOSPITAL_BILL/DISCHARGE_SUMMARY) — genuine, verifies partial-then-full completion sequence.
+- **F054** (`verify_document()` on an out-of-checklist type raises `ValidationError`) — genuine (e.g. `HOSPITAL_BILL` on a motor claim).
+
+I mutation-tested the core completeness check myself (not trusting the generator's own report of having done this): temporarily changed `all_verified = required_types <= verified_types` to `all_verified = True` in the shipped file, re-ran the test file — **2 of 7 tests failed** (`test_missing_document_returns_false_and_claim_stays_docs_pending`, `test_only_health_document_types_are_considered`), exactly the two that should catch this class of bug. Reverted via `git checkout -- src/services/document_checklist_service.py`, confirmed `git status --short` clean, re-ran — 7/7 passed again. Genuine, non-vacuous tests.
+
+### 5. E5-S3 — fraud screening persistence and gating (F059-F062): PASS
+
+Read `fraud_screening_service.run_fraud_screening()` in full. It re-gathers `FraudScoringInput` fresh from the repositories on every call (never caches across invocations), scores via the pure E5-S2 engine, persists via `FraudScreeningRepository.insert()` (append-only by construction, confirmed structurally insert-only in the Group D review), and gates via `ClaimEvent.FRAUD_FLAGGED`/`FRAUD_CLEARED` — the sole two valid events from `FRAUD_SCREENING`.
+
+- **F059** (threshold-at-scoring-time, not current config) — two tests: one confirms a single call stores the passed-in threshold (42) verbatim; the second (`test_a_later_call_with_a_different_config_does_not_change_the_first_row`) runs two scoring calls with different thresholds (60, then 90) against the same claim and confirms the **first** row's `threshold` column is still `60` after the second call — a genuine retroactive-mutation check, not just "the row I just inserted has the right value."
+- **F060/F061** (flagged -> `MANUAL_REVIEW`, unflagged -> `ASSESSMENT`) — both use deterministic zero-rule configs (`_ALWAYS_FLAG_CONFIG`/`_NEVER_FLAG_CONFIG`) to force the boolean outcome independent of the claim's actual data, then re-query claim status directly. Genuine. Note: the AC text for F060 also says "with reason code FRAUD_FLAG" — the service's own docstring discloses this is intentionally deferred, since neither `claim_state_transitions` nor `fraud_screenings` has a `reason_code` column in `data-models.md`; only the future `Decision` row (E6-S2, Group G, not yet built) carries a `ReasonCode`. This is a reasonable, explicitly-disclosed architectural split, not a hidden gap — flagging as a note, not a defect, since assigning `ReasonCode.FRAUD_FLAG` genuinely has nowhere typed to live yet at this layer.
+- **F062** (two screenings on one claim both independently queryable) — `test_two_screenings_on_the_same_claim_are_both_independently_queryable` confirms via raw SQL (`SELECT id, flagged ... ORDER BY id`) that both rows persist with distinct ids and correct, non-overwritten `flagged` values, and separately confirms `FraudScreeningRepository.get_latest()` returns the second (most recent) one — checked two ways, not one.
+
+### 6. E9-S4 — admin API (F103-F106): PASS, genuine end-to-end integration tests
+
+`backend/tests/integration/api/test_admin_router.py` builds the real app via `create_app()` and overrides only `get_app_config`/`get_db_connection` with fixture-owned instances — every request in this file exercises the real router -> service -> repository -> SQLite round trip through `TestClient`, not mocks. Confirmed by reading the fixture setup and by re-running the file directly.
+
+- **F103** (`GET /api/admin/claims?status=...&product=...` filters correctly) — seeds 3 claims across 2 statuses x 2 products, confirms exactly 1 matches both filters. Genuine.
+- **F104** (`GET /api/admin/payouts` lists every settlement as an audit trail) — seeds one settlement, confirms all fields (`settlement_id`, `claim_id`, `payout_amount` as a canonical decimal string, `payment_reference`) round-trip correctly.
+- **F105** (`POST .../override` succeeds, visible in a follow-up `GET .../overrides`) — the strongest test in this router: creates an override via `POST`, captures `override_id` from the response, then makes a separate `GET` request and confirms the same `override_id` appears with matching `admin_actor_id`/`command`/`reason_code`. Genuinely proves persistence across requests, not just an in-memory echo. Companion tests confirm 422 for a blank `reason_code` (Pydantic's own `Field(min_length=1)`, confirmed no override row is inserted), 409 for an invalid transition (`SETTLED` claim, `INVALID_STATE_TRANSITION` error code), 404 for an unknown claim id, and 422 for an unrecognized override command string.
+- **F106** (non-ADMIN role -> 403 on every admin route) — `test_assessor_role_is_forbidden_on_every_admin_route` hits all four admin endpoints (`GET /claims`, `GET /payouts`, `POST .../override`, `GET .../overrides`) with `X-Role: ASSESSOR` in a single test and asserts `403` + `error.code == "FORBIDDEN"` on all four. Traced `require_role()` (`src/api/dependencies/auth.py:76-103`, unmodified by this branch) to confirm role-vs-no-role is correctly split: missing/invalid role -> 401 via `get_actor_context` (runs first, as a nested `Depends`), valid-but-insufficient role -> 403 via `require_role`'s own check. Both paths run before any route handler body, since both raise inside dependency resolution.
+
+Money fields (`claim_amount`, `payout_amount`) are serialized as `str`, never JSON numbers — confirmed in `admin_schemas.py` and in the tests' own string-equality assertions (`"75000.00"`, `"35000.00"`), consistent with the project's Decimal-money convention.
+
+### 7. Two touch-ups to already-merged files — confirmed genuinely additive, non-breaking
+
+- **`ValidationError`/`UnknownClaimTypeError` gain an explicit `http_status_code: ClassVar[int] = 422`.** `git diff main -- backend/src/types/exceptions.py` shows this is the only change to that file — no existing class's `http_status_code`, no `EXCEPTION_STATUS_MAP` entry, and no constructor signature changed. `EXCEPTION_STATUS_MAP`'s length stays pinned at exactly 3 (`PolicyNotActiveException`, `DuplicateClaimException`, `InvalidClaimStateException`), so the Group A test that asserts `len(EXCEPTION_STATUS_MAP) == 3` (`test_exception_status_map_is_consistent_with_class_attributes`) still passes unmodified — confirmed by re-running `tests/unit/types/test_exceptions.py` in isolation (10/10 passed). Both classes already existed on `main` with the default inherited `http_status_code = 500` from `DomainException`; this change only makes their already-intended-422 status explicit and correct for `error_handlers.py` to consume directly. Non-breaking.
+- **`get_connection()` gains `check_same_thread: bool = True` (keyword-only, defaulting to the pre-existing behavior).** `connection.py`'s `sqlite3.connect(db_path, check_same_thread=check_same_thread)` call is the only change; every existing call site that omits the new parameter is unaffected. I did not just trust this — I ran the branch's own `test_get_connection_defaults_to_check_same_thread_true` test, which positively demonstrates the old behavior still holds (a cross-thread `execute()` call on a connection opened with the default still raises `sqlite3.ProgrammingError`, exactly as it would have pre-Group-F), alongside a companion test proving `check_same_thread=False` genuinely allows cross-thread use (used only by `src.api.dependencies.db.get_db_connection`'s single shared connection, needed because FastAPI dispatches sync `Depends` callables via `anyio.to_thread`, a worker thread that can differ request to request). This is real regression-proof evidence, not just a read of the diff. Non-breaking.
+
+Grepped for every call site of `submit_fnol()` and `get_connection()` in `backend/src/` and `backend/tests/`: no other production or test code calls `submit_fnol()` with the old `policy_id=` keyword (the signature change to `policy_number` is clean — no other caller exists anywhere in the codebase yet, confirmed via `grep -rn "submit_fnol"`; `reopen_service.reopen()` creates its sub-claim via a direct `ClaimRepository.create()` call and never calls `submit_fnol()` at all, matching the Group E report's own finding).
+
+### 8. Money math, PII, and architecture — confirmed clean
+
+- **Decimal-only money math:** grepped every file changed/added by this branch (`git diff main...group-f/api-and-validation --stat`) for `float(`, `: float`, `-> float` — zero matches. Admin API money fields are `str` (canonical decimal strings), never JSON numbers, per `admin_schemas.py`'s own docstring and the integration tests' string-equality assertions.
+- **No PII in logs:** grepped the entire `backend/src/` tree (not just this branch's new files) for `logging`, `logger.`, `print(` — zero matches anywhere in the codebase. There is no logging call at all in this backend yet, so there is no PII-in-logs risk to report for this group specifically (or any prior group).
+- **One-way imports:** `admin_router.py` imports only `src.api.*`, `src.repositories.*`, `src.services.admin_override_service`, `src.types.*` — no reverse dependency on `src.ui`. `document_checklist_service.py`/`fraud_screening_service.py` import only `src.repositories.*`, `src.config.fraud_rules_config`, `src.types.*` — no `src.api` import from the Service layer. Matches `.claude/architecture.md`'s one-way layering rule.
+
+---
+
+## Gate re-run results
+
+| Gate | Command | Result |
+|---|---|---|
+| pytest | `pytest -x -q` | 261 passed |
+| pytest + coverage | `pytest --cov=src --cov-report=term-missing -q` | 261 passed, 100% coverage (956/956 stmts) |
+| ruff | `ruff check .` | All checks passed |
+| mypy | `mypy src/` | Success: no issues found in 40 source files |
+
+## Non-blocking observations (nits)
+
+1. F047/F050 test-coverage gap — see the "Defect" section above. Recommend closing this before or as part of E9-S1, either with a standalone `test_error_handlers.py` now or by explicitly re-verifying these two `features.json` entries once `POST /api/claims` exists.
+2. `ClaimRepository.exists_duplicate()`'s "any row counts as a duplicate regardless of status" interpretation (flagged as an open question in the Group D report) is confirmed here to behave as expected for this group's own scope — `submit_fnol()` is the only caller, and it is only ever invoked for genuinely new FNOL submissions in this branch's tests. The Group D report's specific worry (whether `reopen()`'s sub-claim creation could trip this check) remains correctly moot, since `reopen()` still calls `ClaimRepository.create()` directly and never `exists_duplicate()` — reconfirmed by grep in this review.
+3. `requirements.txt`'s `httpx2` dependency (flagged and independently verified as real/necessary in the Group C report) continues to resolve correctly in this branch's `.venv`; unrelated to Group F's own changes.
+
+## Files reviewed
+
+- `specs/stories/E4-S2.md`, `E4-S3.md`, `E5-S1.md`, `E5-S3.md`, `E9-S4.md`
+- `specs/design/data-models.md`, `api-contracts.md` (Admin API section, error envelope, error table)
+- `.claude/architecture.md`, `.claude/skills/code-gen/SKILL.md`
+- `backend/src/services/fnol_intake_service.py` (diffed against Group E's version), `document_checklist_service.py`, `fraud_screening_service.py`
+- `backend/src/api/routers/admin_router.py`, `schemas/admin_schemas.py`, `error_handlers.py`, `dependencies/db.py`, `dependencies/auth.py` (re-read, unmodified)
+- `backend/src/repositories/policy_repository.py`, `claim_repository.py`, `claim_document_repository.py` (all diffed against Group D's versions)
+- `backend/src/types/exceptions.py`, `backend/src/db/connection.py` (both diffed against `main`)
+- `backend/src/main.py`
+- `backend/tests/unit/services/test_fnol_intake_service.py`, `test_document_checklist_service.py` (mutation-tested), `test_fraud_screening_service.py`
+- `backend/tests/unit/repositories/test_claim_repository.py`, `test_policy_repository.py`, `test_claim_document_repository.py`, `test_connection.py`
+- `backend/tests/unit/api/dependencies/test_db.py`
+- `backend/tests/unit/types/test_exceptions.py` (re-run in isolation, confirmed unmodified and still passing)
+- `backend/tests/integration/api/test_admin_router.py`
+- `backend/src/api/error_handlers.py` (mutation-tested — swapped `POLICY_INACTIVE`/`DUPLICATE_CLAIM` mapping entries, confirmed 0 of 261 tests catch it, reverted via `git checkout`, confirmed clean)
+- `features.json` (F044-F050, F051-F054, F059-F062, F103-F106 — 19 features — currently marked `passes: true`; F047 and F050 specifically should be treated as unverified pending the fix recommended above)

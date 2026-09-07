@@ -56,7 +56,19 @@ class InvalidClaimStateException(DomainException):
 
 
 class UnknownClaimTypeError(DomainException):
-    """Raised when a claim_type outside {MOTOR, HEALTH, LIFE} is requested."""
+    """Raised when a claim_type outside {MOTOR, HEALTH, LIFE} is requested.
+
+    Maps to HTTP 422 (api-contracts.md sec "Claims API" error table: "422 |
+    VALIDATION_ERROR | Missing/malformed field, unknown claim_type"). Not
+    added to `EXCEPTION_STATUS_MAP` -- that dict's length is pinned to
+    exactly 3 by E1-S3's own test (`test_exception_status_map_is_consistent
+    _with_class_attributes`), covering only the 3 exceptions F013's AC text
+    names explicitly. `error_handlers.py` (E9-S4) reads `http_status_code`
+    directly off every `DomainException` subclass instead of consulting that
+    map, so this ClassVar override is sufficient on its own.
+    """
+
+    http_status_code: ClassVar[int] = 422
 
     def __init__(self, claim_type: str) -> None:
         self.claim_type = claim_type
@@ -81,7 +93,15 @@ class ConfigError(DomainException):
 
 class ValidationError(DomainException):
     """Raised for domain validation failures that are not one of the more
-    specific typed exceptions above (e.g. a missing mandatory reason_code)."""
+    specific typed exceptions above (e.g. a missing mandatory reason_code).
+
+    Maps to HTTP 422 (api-contracts.md: every `VALIDATION_ERROR` response
+    across the API is a 422). See `UnknownClaimTypeError`'s docstring above
+    for why this is a plain ClassVar override rather than an
+    `EXCEPTION_STATUS_MAP` addition.
+    """
+
+    http_status_code: ClassVar[int] = 422
 
 
 EXCEPTION_STATUS_MAP: dict[type[Exception], int] = {

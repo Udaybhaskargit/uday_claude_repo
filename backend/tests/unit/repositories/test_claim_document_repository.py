@@ -95,3 +95,32 @@ class TestListByClaim:
         repo = ClaimDocumentRepository(conn)
 
         assert repo.list_by_claim(claim_id) == []
+
+
+class TestMarkVerified:
+    """Group F (E5-S1) addition: toggles one checklist row to VERIFIED."""
+
+    def test_mark_verified_flips_status_for_matching_row_only(
+        self, conn: sqlite3.Connection, claim_id: int
+    ) -> None:
+        repo = ClaimDocumentRepository(conn)
+        repo.insert(claim_id, DocumentType.POLICE_FIR)
+        repo.insert(claim_id, DocumentType.INVOICE)
+
+        repo.mark_verified(claim_id, DocumentType.POLICE_FIR)
+
+        documents = {d.document_type: d.verification_status for d in repo.list_by_claim(claim_id)}
+        assert documents[DocumentType.POLICE_FIR] == VerificationStatus.VERIFIED
+        assert documents[DocumentType.INVOICE] == VerificationStatus.MISSING
+
+    def test_mark_verified_is_a_noop_for_a_non_matching_row(
+        self, conn: sqlite3.Connection, claim_id: int
+    ) -> None:
+        repo = ClaimDocumentRepository(conn)
+        repo.insert(claim_id, DocumentType.POLICE_FIR)
+
+        repo.mark_verified(claim_id, DocumentType.HOSPITAL_BILL)
+
+        documents = repo.list_by_claim(claim_id)
+        assert len(documents) == 1
+        assert documents[0].verification_status == VerificationStatus.MISSING

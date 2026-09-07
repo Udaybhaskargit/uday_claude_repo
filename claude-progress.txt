@@ -180,3 +180,42 @@ notes: MILESTONE -- Service layer complete (backend/src/services/: fnol_intake_s
 next_action: Run /auto --mode full to begin Group F (E4-S2 policy-active validation, E4-S3
   duplicate-FNOL detection, E5-S1 document checklist gate, E5-S3 fraud-screening persistence,
   E9-S4 admin API -- 19 features)
+
+=== Session 8 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C, D, E, F]
+groups_remaining: [G, H, I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: (pending -- see PR opened this session)
+features_passing: 83 / 130
+coverage: 100%
+learned_rules: 0
+blocked_stories: none
+notes: Group F complete -- E4-S2 (policy-active validation) and E4-S3 (duplicate-FNOL detection)
+  both landed inside fnol_intake_service.submit_fnol(), which now resolves policy_number to a
+  Policy internally (signature changed from a raw policy_id int) instead of trusting a caller-
+  supplied FK; E5-S1 added document_checklist_service.py (check_documents_complete(),
+  verify_document()), reusing fnol_intake_service.CHECKLISTS as the single source of truth for
+  which DocumentTypes belong to which ClaimType; E5-S3 added fraud_screening_service.py,
+  fulfilling the fraud_scoring_engine's own forward-reference to gather recent_claim_count_90d
+  (new ClaimRepository.count_recent_claims()) and has_verified_police_fir before scoring, and
+  persisting+gating per screening; E9-S4 added the first real business API surface
+  (api/routers/admin_router.py, api/schemas/admin_schemas.py, api/error_handlers.py) -- the first
+  group to need error_handlers.py, now wired into main.py per component-map.md, translating every
+  DomainException to its own http_status_code and bare LookupError to 404. Two small, disclosed
+  Group-A/C touch-ups rode along: ValidationError/UnknownClaimTypeError gained explicit
+  http_status_code=422 ClassVars (EXCEPTION_STATUS_MAP itself left untouched, since an existing
+  E1-S3 test pins its length at exactly 3); db.connection.get_connection() gained an additive
+  check_same_thread keyword (default True, so existing callers are unaffected) because the shared
+  per-request DB connection (api/dependencies/db.py, new) is accessed from FastAPI's dependency
+  threadpool across requests -- caught by Starlette TestClient's own portal-thread execution model
+  during this session's own test-writing, not a pre-existing bug. 261 tests passed, 100% coverage
+  (956/956 stmts), ruff clean, mypy clean (all verified directly in this session, not yet
+  independently re-run by a separate evaluator agent -- flagging that as a gap versus prior
+  groups' process for the coordinator to weigh before merging).
+next_action: Independently re-verify Group F (a fresh evaluator pass didn't run in this session),
+  then merge its PR and run /auto --mode full to begin Group G (E6-S2 decision engine, E9-S2
+  document verification API, E11-S4 admin dashboard UI -- 12 features)

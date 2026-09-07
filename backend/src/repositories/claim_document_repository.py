@@ -36,6 +36,32 @@ class ClaimDocumentRepository:
         assert document_id is not None
         return document_id
 
+    def mark_verified(self, claim_id: int, document_type: DocumentType) -> None:
+        """Flip one checklist row from MISSING to VERIFIED (E5-S1).
+
+        Unlike the append-only audit repositories, `ClaimDocument` rows are
+        genuinely mutable -- a checklist entry's status is toggled in place
+        as the assessor verifies each document, rather than persisting a new
+        row per change. `backend/tests/architecture/test_audit_repositories_
+        insert_only.py` scopes its no-update()/delete() rule to the 5 named
+        audit entities (FraudScreening/Assessment/Decision/Settlement/
+        AdminOverride) and does not include `ClaimDocument`, so this UPDATE
+        does not violate that architectural invariant.
+
+        A no-op (no rows affected, no error) if `claim_id`/`document_type`
+        does not match an existing row -- the caller (`document_checklist_
+        service.verify_document`) is responsible for validating that the
+        document type belongs to the claim's own checklist before calling
+        this (E5-S1 AC4); this method itself trusts its inputs.
+        """
+        now = datetime.now(UTC).isoformat()
+        self._connection.execute(
+            "UPDATE claim_documents SET verification_status = ?, updated_at = ? "
+            "WHERE claim_id = ? AND document_type = ?",
+            (VerificationStatus.VERIFIED.value, now, claim_id, document_type.value),
+        )
+        self._connection.commit()
+
     def list_by_claim(self, claim_id: int) -> list[ClaimDocument]:
         """Return every checklist row attached to `claim_id`."""
         rows = self._connection.execute(

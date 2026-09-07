@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from pathlib import Path
 
 from src.db.connection import get_connection
@@ -38,6 +39,58 @@ def test_get_connection_rows_support_dict_like_access(tmp_path: Path) -> None:
         row = conn.execute("SELECT id, name FROM t").fetchone()
 
         assert row["name"] == "sample"
+    finally:
+        conn.close()
+
+
+def test_get_connection_defaults_to_check_same_thread_true(tmp_path: Path) -> None:
+    """Existing behavior is unchanged unless a caller opts out (Group F addition)."""
+    db_path = tmp_path / "test.db"
+    conn = get_connection(str(db_path))
+    try:
+        conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        conn.commit()
+
+        errors: list[BaseException] = []
+
+        def _use_from_other_thread() -> None:
+            try:
+                conn.execute("SELECT * FROM t")
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        thread = threading.Thread(target=_use_from_other_thread)
+        thread.start()
+        thread.join()
+
+        assert len(errors) == 1
+        assert isinstance(errors[0], sqlite3.ProgrammingError)
+    finally:
+        conn.close()
+
+
+def test_get_connection_check_same_thread_false_allows_cross_thread_use(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "test.db"
+    conn = get_connection(str(db_path), check_same_thread=False)
+    try:
+        conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+        conn.commit()
+
+        errors: list[BaseException] = []
+
+        def _use_from_other_thread() -> None:
+            try:
+                conn.execute("SELECT * FROM t")
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        thread = threading.Thread(target=_use_from_other_thread)
+        thread.start()
+        thread.join()
+
+        assert errors == []
     finally:
         conn.close()
 

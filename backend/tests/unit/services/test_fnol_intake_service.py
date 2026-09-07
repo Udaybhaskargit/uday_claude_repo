@@ -1,4 +1,7 @@
-"""Unit tests for `src.services.fnol_intake_service` (E4-S1, F040-F043)."""
+"""Unit tests for `src.services.fnol_intake_service`.
+
+Covers E4-S1 (F040-F043), E4-S2 (F044-F047), and E4-S3 (F048-F050).
+"""
 
 from __future__ import annotations
 
@@ -13,7 +16,11 @@ from src.repositories.claim_document_repository import ClaimDocumentRepository
 from src.repositories.claim_repository import ClaimRepository
 from src.services.fnol_intake_service import submit_fnol
 from src.types.enums import ClaimEvent, ClaimStatus, ClaimType, DocumentType, VerificationStatus
-from src.types.exceptions import UnknownClaimTypeError
+from src.types.exceptions import (
+    DuplicateClaimException,
+    PolicyNotActiveException,
+    UnknownClaimTypeError,
+)
 
 REAL_MIGRATIONS_DIR = Path(__file__).resolve().parents[3] / "migrations"
 
@@ -33,7 +40,7 @@ def _insert_policy(
     status: str = "ACTIVE",
     sum_insured: str = "500000.00",
     effective_date: str = "2025-01-01",
-    expiry_date: str = "2025-12-31",
+    expiry_date: str = "2026-12-31",
 ) -> int:
     cursor = conn.execute(
         "INSERT INTO policies "
@@ -55,26 +62,26 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
 
 
 @pytest.fixture
-def policy_id(conn: sqlite3.Connection) -> int:
-    return _insert_policy(conn)
+def policy_number(conn: sqlite3.Connection) -> str:
+    _insert_policy(conn, policy_number="POL-001")
+    return "POL-001"
 
 
 class TestSubmitFnolMotor:
     """F040: MOTOR FNOL -> claim_type=MOTOR, checklist = POLICE_FIR + INVOICE."""
 
     def test_motor_fnol_creates_claim_and_checklist(
-        self, conn: sqlite3.Connection, policy_id: int
+        self, conn: sqlite3.Connection, policy_number: str
     ) -> None:
         claim = submit_fnol(
             conn,
-            policy_id=policy_id,
+            policy_number=policy_number,
             claim_type=ClaimType.MOTOR,
             incident_date="2026-03-10",
             claim_amount=Decimal("40000.00"),
         )
 
         assert claim.claim_type == ClaimType.MOTOR
-        assert claim.policy_id == policy_id
 
         documents = ClaimDocumentRepository(conn).list_by_claim(claim.id)
         assert len(documents) == 2
@@ -87,11 +94,11 @@ class TestSubmitFnolHealth:
     """F041: HEALTH FNOL -> checklist = HOSPITAL_BILL + DISCHARGE_SUMMARY."""
 
     def test_health_fnol_creates_exact_checklist(
-        self, conn: sqlite3.Connection, policy_id: int
+        self, conn: sqlite3.Connection, policy_number: str
     ) -> None:
         claim = submit_fnol(
             conn,
-            policy_id=policy_id,
+            policy_number=policy_number,
             claim_type=ClaimType.HEALTH,
             incident_date="2026-04-01",
             claim_amount=Decimal("15000.00"),
@@ -110,11 +117,11 @@ class TestSubmitFnolLife:
     """F042: LIFE FNOL -> checklist = DEATH_CERTIFICATE (exactly one row)."""
 
     def test_life_fnol_creates_single_checklist_row(
-        self, conn: sqlite3.Connection, policy_id: int
+        self, conn: sqlite3.Connection, policy_number: str
     ) -> None:
         claim = submit_fnol(
             conn,
-            policy_id=policy_id,
+            policy_number=policy_number,
             claim_type=ClaimType.LIFE,
             incident_date="2026-02-01",
             claim_amount=Decimal("500000.00"),
@@ -132,13 +139,13 @@ class TestSubmitFnolLifecycle:
     """F043: claim starts at INTAKE, ends at DOCS_PENDING once checklist attached."""
 
     def test_claim_starts_intake_and_ends_docs_pending(
-        self, conn: sqlite3.Connection, policy_id: int
+        self, conn: sqlite3.Connection, policy_number: str
     ) -> None:
         claim_repository = ClaimRepository(conn)
 
         claim = submit_fnol(
             conn,
-            policy_id=policy_id,
+            policy_number=policy_number,
             claim_type=ClaimType.MOTOR,
             incident_date="2026-05-01",
             claim_amount=Decimal("10000.00"),
@@ -161,11 +168,11 @@ class TestSubmitFnolLifecycle:
         assert transition_rows[0]["event"] == ClaimEvent.ATTACH_CHECKLIST.value
 
     def test_actor_id_is_recorded_on_the_transition(
-        self, conn: sqlite3.Connection, policy_id: int
+        self, conn: sqlite3.Connection, policy_number: str
     ) -> None:
         claim = submit_fnol(
             conn,
-            policy_id=policy_id,
+            policy_number=policy_number,
             claim_type=ClaimType.MOTOR,
             incident_date="2026-06-01",
             claim_amount=Decimal("20000.00"),
@@ -182,12 +189,12 @@ class TestUnknownClaimType:
     """Defensive: a claim_type outside {MOTOR, HEALTH, LIFE} fails loudly."""
 
     def test_raises_unknown_claim_type_error(
-        self, conn: sqlite3.Connection, policy_id: int
+        self, conn: sqlite3.Connection, policy_number: str
     ) -> None:
         with pytest.raises(UnknownClaimTypeError):
             submit_fnol(
                 conn,
-                policy_id=policy_id,
+                policy_number=policy_number,
                 claim_type="BOGUS",  # type: ignore[arg-type]
                 incident_date="2026-07-01",
                 claim_amount=Decimal("1000.00"),
@@ -196,3 +203,129 @@ class TestUnknownClaimType:
         # No claim row should have been created for the rejected claim_type.
         rows = conn.execute("SELECT COUNT(*) AS n FROM claims").fetchone()
         assert rows["n"] == 0
+
+
+class TestPolicyActiveValidation:
+    """E4-S2 / F044-F047: policy must be ACTIVE on incident_date."""
+
+    def test_lapsed_policy_raises_and_creates_no_claim(self, conn: sqlite3.Connection) -> None:
+        """F044."""
+        _insert_policy(conn, policy_number="POL-LAPSED", status="LAPSED")
+
+        with pytest.raises(PolicyNotActiveException) as excinfo:
+            submit_fnol(
+                conn,
+                policy_number="POL-LAPSED",
+                claim_type=ClaimType.MOTOR,
+                incident_date="2026-03-10",
+                claim_amount=Decimal("10000.00"),
+            )
+
+        assert excinfo.value.policy_number == "POL-LAPSED"
+        rows = conn.execute("SELECT COUNT(*) AS n FROM claims").fetchone()
+        assert rows["n"] == 0
+
+    def test_incident_after_expiry_raises(self, conn: sqlite3.Connection) -> None:
+        """F045."""
+        _insert_policy(
+            conn,
+            policy_number="POL-EXPIRED-WINDOW",
+            status="ACTIVE",
+            effective_date="2025-01-01",
+            expiry_date="2025-12-31",
+        )
+
+        with pytest.raises(PolicyNotActiveException):
+            submit_fnol(
+                conn,
+                policy_number="POL-EXPIRED-WINDOW",
+                claim_type=ClaimType.MOTOR,
+                incident_date="2026-01-15",
+                claim_amount=Decimal("10000.00"),
+            )
+
+    def test_incident_within_window_proceeds(self, conn: sqlite3.Connection) -> None:
+        """F046."""
+        _insert_policy(
+            conn,
+            policy_number="POL-IN-WINDOW",
+            status="ACTIVE",
+            effective_date="2025-01-01",
+            expiry_date="2025-12-31",
+        )
+
+        claim = submit_fnol(
+            conn,
+            policy_number="POL-IN-WINDOW",
+            claim_type=ClaimType.MOTOR,
+            incident_date="2025-06-15",
+            claim_amount=Decimal("10000.00"),
+        )
+
+        assert claim.status == ClaimStatus.DOCS_PENDING
+
+    def test_unresolvable_policy_number_raises_policy_not_active(
+        self, conn: sqlite3.Connection
+    ) -> None:
+        """No such policy at all is treated the same as an inactive one."""
+        with pytest.raises(PolicyNotActiveException):
+            submit_fnol(
+                conn,
+                policy_number="DOES-NOT-EXIST",
+                claim_type=ClaimType.MOTOR,
+                incident_date="2026-03-10",
+                claim_amount=Decimal("10000.00"),
+            )
+
+
+class TestDuplicateFnolDetection:
+    """E4-S3 / F048-F049: reject a second FNOL for the same (policy, date)."""
+
+    def test_duplicate_policy_and_date_raises_and_creates_no_second_claim(
+        self, conn: sqlite3.Connection, policy_number: str
+    ) -> None:
+        """F048."""
+        submit_fnol(
+            conn,
+            policy_number=policy_number,
+            claim_type=ClaimType.MOTOR,
+            incident_date="2026-03-10",
+            claim_amount=Decimal("10000.00"),
+        )
+
+        with pytest.raises(DuplicateClaimException) as excinfo:
+            submit_fnol(
+                conn,
+                policy_number=policy_number,
+                claim_type=ClaimType.MOTOR,
+                incident_date="2026-03-10",
+                claim_amount=Decimal("20000.00"),
+            )
+
+        assert excinfo.value.policy_number == policy_number
+        rows = conn.execute("SELECT COUNT(*) AS n FROM claims").fetchone()
+        assert rows["n"] == 1
+
+    def test_distinct_incident_date_on_same_policy_succeeds(
+        self, conn: sqlite3.Connection, policy_number: str
+    ) -> None:
+        """F049."""
+        submit_fnol(
+            conn,
+            policy_number=policy_number,
+            claim_type=ClaimType.MOTOR,
+            incident_date="2026-03-10",
+            claim_amount=Decimal("10000.00"),
+        )
+
+        second_claim = submit_fnol(
+            conn,
+            policy_number=policy_number,
+            claim_type=ClaimType.MOTOR,
+            incident_date="2026-04-01",
+            claim_amount=Decimal("20000.00"),
+        )
+
+        assert second_claim.status == ClaimStatus.DOCS_PENDING
+        rows = conn.execute("SELECT COUNT(*) AS n FROM claims").fetchone()
+        assert rows["n"] == 2
