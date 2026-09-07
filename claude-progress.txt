@@ -262,3 +262,53 @@ notes: Group G's two backend stories landed: E6-S2 added services/decision_engin
 next_action: Independently re-verify Group G's backend stories (E6-S2, E9-S2), merge its PR, then
   decide whether to scaffold frontend/ before or alongside Group H, and separately schedule E11-S4
   once that scaffold exists.
+
+=== Session 10 ===
+date: 2026-09-07T00:00:00Z
+mode: full
+groups_completed: [A, B, C, D, E, F, G (backend: E6-S2, E9-S2)]
+groups_remaining: [G (E11-S4 UI), H, I, J, K]
+current_group: none
+current_stories: []
+sprint_contract: none
+last_commit: (pending -- see PR opened this session)
+features_passing: 91 / 130
+coverage: backend 100%; frontend has no story features yet (scaffold only, not tracked in
+  features.json)
+learned_rules: 0
+blocked_stories: none (this session unblocks E11-S4 and all of Groups J/K, which are UI stories)
+notes: MILESTONE -- frontend/ scaffolded from nothing, unblocking every remaining UI story
+  (E11-S4 in Group G, all of J, K). This is pure infrastructure/substrate, not a features.json
+  story, so features.json was left untouched. Stack (per specs/design/folder-structure.md):
+  Vite + React 18 + TypeScript, Tailwind (theme colors pulled from the mockups' navy/amber/slate
+  palette), react-router-dom, vitest + @testing-library/react for unit tests, Playwright for e2e.
+  Built: the full frontend/src/types (enums.ts + models.ts mirroring backend/src/types
+  field-for-field, money fields typed `string` since the API serializes Decimal as a canonical
+  decimal string per api-contracts.md), frontend/src/config/env.ts, frontend/src/api/httpClient.ts
+  (the one place fetch() is called; attaches X-Role/X-Actor-Id, parses the {error:{code,message,
+  details}} envelope into a typed ApiError), frontend/src/context/AuthContext.tsx (stub role/actor
+  picker, since E8-S1's backend auth is a header stub with no real credential check), and 5 shared
+  components (RoleGuard, StatusBadge, ReasonCodeText, ConfirmDialog, QueueTable) per
+  folder-structure.md's enumerated list. App.tsx wires up role-guarded routes for all 7 upcoming
+  UI stories (E10-S1/S2/S3, E11-S1/S2/S3/S4), each currently rendering a shared PagePlaceholder
+  shell -- deliberately not stubbing out empty feature-component files under src/features/, since
+  those are real story work for the generator agents that build E10/E11, not scaffold. All 4 gates
+  verified directly in this session: `npm run typecheck` clean, `npm run lint` clean (0 errors, 1
+  non-blocking react-refresh warning on AuthContext's dual component+hook export -- a standard,
+  accepted pattern), `npm test` (vitest) 1/1 passing, `npm run build` succeeds, `npm run dev` serves
+  a working shell on :5173 (curled and confirmed), and `npx playwright test` (1/1) passing end-to-end
+  against a live Playwright-managed dev server -- installed chromium via `npx playwright install`
+  first since it wasn't present. IMPORTANT: this session found unrelated, uncommitted backend
+  changes already sitting in the working tree when it started (modified main.py,
+  claim_repository.py, decision_engine.py; new workbench_router.py, workbench_schemas.py,
+  claim_pipeline_service.py, rules_config.py, and their tests) -- evidently a concurrent Group H
+  agent working in this same physical checkout. This session's commit stages and touches ONLY
+  frontend/ and this claude-progress.txt entry; the backend working-tree changes were left exactly
+  as found for whichever session owns them to commit separately. Future sessions: be aware this
+  repo's working tree can have multiple agents' uncommitted work coexisting -- always check
+  `git status` and scope `git add` narrowly before committing, never `git add -A`.
+next_action: Independently re-verify this frontend scaffold (or accept the gate results above as
+  sufficient given it's infrastructure, not a story), merge its PR, then let Group H's agent (or a
+  fresh one) resume E11-S4 plus Groups H/I/J/K now that frontend/ exists. Also reconcile whatever
+  concurrent Group H backend work was found uncommitted in the working tree at the start of this
+  session.
